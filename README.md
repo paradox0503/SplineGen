@@ -52,13 +52,15 @@ It can be run with Pytorch 2.0.1 + CUDA 11.8 on the operating system Ubuntu 22.0
 
     ```shell
     # train encoder
-    python src/splinegen/main.py train_encoder --dataset_path /path/to/dataset 
+    python src/splinegen/main.py train_encoder --dataset_path /home/lab/spline/data/2d_train.npz 
     # train knot decoder
-    python src/splinegen/main.py train_knot_decoder --dataset_path /path/to/dataset --encoder_path /path/to/encoder/path
+    python src/splinegen/main.py train_knot_decoder --dataset_path /home/lab/spline/data/2d_train.npz --encoder_path /home/lab/spline/SplineGen/src/splinegen/results/train_encoder/models/20250716-034900/epoch_10.pth
     # train parameter decoder
-    python src/splinegen/main.py train_param_decoder --dataset_path /path/to/dataset --knot_path /path/to/knot/generation/model
+    python src/splinegen/main.py train_param_decoder --dataset_path /home/lab/spline/data/2d_train.npz --knot_path /home/lab/spline/SplineGen/src/splinegen/results/train_knot_decoder/models/20250716-045058/epoch_10.pth
     # train knot decoder
-    python src/splinegen/main.py train_diff_approximation --dataset_path /path/to/dataset --base_model_path /path/to/knot&param/generation/model 
+    python src/splinegen/main.py train_diff_approximation --dataset_path /home/lab/spline/data/2d_train.npz --base_model_path /home/lab/spline/SplineGen/src/splinegen/results/train_param_decoder/models/20250716-052017_epoch_9.pth
+
+    python src/splinegen/main.py test --dataset_path /home/lab/spline/data/2d_eval.npz --model_path /home/lab/spline/SplineGen/src/splinegen/results/train_diff_approximation/models/20250716-060440/epoch_5.pth
     ```
 
 - You can test the model by the command following

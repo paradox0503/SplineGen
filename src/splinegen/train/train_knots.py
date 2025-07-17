@@ -27,7 +27,7 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir):
     input_dim=dataset.dimension
     learning_rate = 0.0001 #This is very good: learning_rate = 0.0001
     # learning_rate = 0.00001 # have a test
-    epochs = 1000
+    epochs = 10
     batch_size =  255
     # Create DataLoader for training data
     print('# Create DataLoader for training data')

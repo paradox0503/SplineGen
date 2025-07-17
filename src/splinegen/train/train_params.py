@@ -14,7 +14,7 @@ TOKENS = {
 }
 
 def train(data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,
-          n_workers=4,n_epochs=1000,batch_size=256,lr=1e-4,save_epoch=5):
+          n_workers=4,n_epochs=10,batch_size=256,lr=1e-4,save_epoch=5):
     torch.random.manual_seed(231)
 
     use_cuda = True
