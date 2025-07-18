@@ -34,21 +34,6 @@ def eval(data_path,model_load_path,use_cuda=True,n_workers=4,batch_size=256):
 
     INPUT_ORDERED=False
 
-    def params_loss_fn(params_label,params,params_mask):
-        loss = torch.nn.functional.mse_loss(params, params_label, reduction='none')
-    
-        # inverted_Token_mask = 1 - Token_mask
-        # masked_loss = loss * inverted_Token_mask
-        
-        loss = loss.masked_fill(params_mask == 0, 0)
-        loss = loss.sum(dim=-1)
-        # loss = loss.sum(dim=-1)
-        valid_len = params_mask.sum(dim = -1)
-
-        loss = loss/valid_len
-        loss= torch.mean(loss)
-
-        return loss
 
     train_loss = AverageMeter()
     train_loss_order = AverageMeter()

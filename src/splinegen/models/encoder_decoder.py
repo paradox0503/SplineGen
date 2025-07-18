@@ -200,7 +200,8 @@ class SplineGen(nn.Module):
                 label,knots[:,:-1],knots_mask[:,:-1],half_eval=half_eval,eval=eval)
 
         if eval:
-            indices=pointer_argmaxs.unsqueeze(-1).expand(-1, -1, 3).clip(0,points.size(1)-1).long()
+            _,_,dimension=points.shape
+            indices=pointer_argmaxs.unsqueeze(-1).expand(-1, -1, dimension).clip(0,points.size(1)-1).long()
             points=torch.gather(points,1,torch.where(indices==0,0,(indices-1)))
 
         params,knots=self.additional_model(points,params,points_mask,knots,knots_mask)

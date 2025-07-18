@@ -19,7 +19,7 @@ TOKENS = {
   '<eos>': 0
 }
   
-def train(data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n_workers=4,n_epochs=1000,batch_size=256,lr=1e-6):
+def train(data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n_workers=8,n_epochs=10,batch_size=256,lr=1e-6):
     model_save_path=model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
@@ -40,7 +40,7 @@ def train(data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n
     print(f'# val:   {len(dataset):7d}')
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-      num_workers=n_workers,shuffle=True)
+      num_workers=n_workers,shuffle=True, pin_memory=True, persistent_workers=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
       num_workers=n_workers,shuffle=False)
 

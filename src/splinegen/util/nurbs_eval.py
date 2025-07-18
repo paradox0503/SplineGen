@@ -256,6 +256,90 @@ def getCtrlPts(p,input):
     return loss,solution
     # return torch.functional.F.mse_loss((N_all@solution),points)
 
+import torch
+
+def getCtrlPts3(p, input):
+    """
+    重写后的 B样条控制点求解函数（向量化，GPU优化）
+    
+    参数:
+        p: 曲线阶数（int）
+        input: tuple，包含
+            params: (batch, seq_len)
+            points: (batch, seq_len, dim)
+            points_mask: (batch, seq_len)
+            knot_u: (batch, knot_len)
+            knots_len: (batch,)
+    返回:
+        loss: 标量，残差范数总和
+        solution: (batch, 30, dim)，控制点解
+    """
+    params, points, points_mask, knot_u, knots_len = input
+    device = params.device
+
+    # 掩码填充
+    params = torch.masked_fill(params, ~points_mask.bool(), 0)
+    points = torch.masked_fill(points, ~points_mask.unsqueeze(-1).bool(), 0)
+
+    U = knot_u  # (batch, knot_len)
+
+    u = params  # (batch, seq_len)
+
+    # 1. 向量化计算 uspan_uv （每个 u 对应的区间）
+    # U区间是从p开始的，因此只看 U[:, p:] 部分
+    U_p = U[:, p:]  # (batch, knot_len-p)
+    # 计算 u_i 在 U_j 和 U_{j+1} 之间的索引 j
+    # mask shape: (batch, seq_len, knot_len-p)
+    mask = (u.unsqueeze(-1) >= U_p.unsqueeze(1))  # True表示 u >= U_j
+
+    # uspan_uv = 每个 u 在 U 中最大满足 u>=U_j 的 j 的索引（相对于 U[:, p:]）
+    uspan_uv = mask.sum(dim=-1) - 1 + p  # (batch, seq_len), -1是因为索引从0开始
+
+    # 2. 计算基函数Ni，大小 (batch, seq_len, p+1)
+    batch_size, seq_len = u.shape
+    dim = points.shape[-1]
+
+    Ni = torch.zeros(batch_size, seq_len, p + 1, device=device, dtype=u.dtype)
+    Ni[..., 0] = 1.0
+
+    for k in range(1, p + 1):
+        left = u - torch.gather(U, 1, (uspan_uv - k).clamp(min=0))  # (batch, seq_len)
+        right = torch.gather(U, 1, (uspan_uv + 1 - k).clamp(max=U.shape[1] - 1)) - u  # (batch, seq_len)
+
+        left_div = left / torch.clamp(left + right, min=1e-8)
+        right_div = right / torch.clamp(left + right, min=1e-8)
+
+        Ni[..., k] = left_div * Ni[..., k - 1] + right_div * Ni[..., k - 1]
+
+    # 3. 构造N_all矩阵，shape (batch, seq_len, 30)
+    max_ctrl_pts = 30
+    N_all = torch.zeros(batch_size, seq_len, max_ctrl_pts, device=device, dtype=u.dtype)
+
+    # scatter基函数到对应的控制点索引
+    # scatter indices shape (batch, seq_len, p+1)
+    scatter_indices = uspan_uv.unsqueeze(-1) + torch.arange(-p, 1, device=device)
+    scatter_indices = scatter_indices.clamp(min=0, max=max_ctrl_pts - 1)
+
+    # scatter操作
+    N_all.scatter_(-1, scatter_indices, Ni)
+
+    # 4. 掩码处理
+    N_all = torch.masked_fill(N_all, ~points_mask.unsqueeze(-1).bool(), 0)
+
+    # 5. 解线性最小二乘问题 N_all @ solution = points
+    # 使用 torch.linalg.lstsq 替代 pinv
+    solution = torch.linalg.lstsq(N_all, points).solution  # shape (batch, 30, dim)
+
+    # 6. 计算残差
+    residuals = points - torch.bmm(N_all, solution)
+    residuals = torch.masked_fill(residuals, ~points_mask.unsqueeze(-1).bool(), 0)
+
+    # 7. 计算 loss: 选用最大范数+求和
+    loss = torch.linalg.norm(residuals, dim=-1).max(dim=-1)[0].sum()
+
+    return loss, solution
+
+
 def getCtrlPts2(p,input,reduce=True):
     # input will be of dimension (batch_size, m+1, n+1, dimension)
     # 1 batch

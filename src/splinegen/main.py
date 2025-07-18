@@ -6,7 +6,7 @@ import train.train_encoder
 import train.train_knots
 import train.train_params
 import train.train_differientiable_approximation_layer
-import train.eval
+import train.eval2 
 
 parser = argparse.ArgumentParser("SplineGen")
 parser.add_argument(
@@ -70,7 +70,7 @@ if not results_path.exists():
     results_path.mkdir(parents=True, exist_ok=True)
 
 if args.task=='train_encoder':
-    train.train_encoder.train(args.dataset_path,log_path,model_save_path)
+    train.train_encoder.train(args.dataset_path,log_path,model_save_path,args.num_workers)
 
 elif args.task=='train_knot_decoder':
     train.train_knots.train(args.dataset_path,log_path,args.encoder_path,model_save_path)
@@ -82,4 +82,4 @@ elif args.task=='train_diff_approximation':
     train.train_differientiable_approximation_layer.train(args.dataset_path,log_path,model_save_path,args.base_model_path)
 
 elif args.task=='test':
-    train.eval.eval(args.dataset_path,args.model_path)
+    train.eval2.eval(args.dataset_path,args.model_path)

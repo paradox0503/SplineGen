@@ -14,7 +14,7 @@ import datetime
 from dataset.curveDataset_for_encoder import CurveDataset_for_encoder
 from torch.utils.data import random_split
 
-def train(data_path,log_dir,model_save_dir):
+def train(data_path,log_dir,model_save_dir,n_workers):
     # token_size=256
     dataset = CurveDataset_for_encoder(
         data_path=data_path)
@@ -30,7 +30,7 @@ def train(data_path,log_dir,model_save_dir):
     num_decoder_layers = 3
     dim_feedforward = 2048
     dropout = 0.05
-    learning_rate = 0.00001 #This is very good: learning_rate = 0.0001
+    learning_rate = 0.0001 #This is very good: learning_rate = 0.0001
     # learning_rate = 0.00001 # have a test
     epochs = 10
     batch_size =  256
@@ -38,8 +38,8 @@ def train(data_path,log_dir,model_save_dir):
     print('# Create DataLoader for training data')
 
     train_dataset,val_dataset=random_split(dataset,[int(len(dataset)*0.8),len(dataset)-int(len(dataset)*0.8)],generator=torch.Generator().manual_seed(42))
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,num_workers=n_workers, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size,shuffle=True,num_workers=n_workers, pin_memory=True)
 
     input_dim=dataset.dimension
 
@@ -89,7 +89,7 @@ def train(data_path,log_dir,model_save_dir):
 
     # TensorBoard setup
     writer = SummaryWriter(log_dir=log_dir)
-
+    scaler = torch.cuda.amp.GradScaler()
     def train_step(model,
                    batch,loss_avg:AverageMeter,
                    loss1_avg:AverageMeter,
@@ -102,15 +102,16 @@ def train(data_path,log_dir,model_save_dir):
         batch_params = batch['params_expanded'].to(device)
         batch_params_mask = batch['params_mask_expanded'].to(device)
 
-        output1,output2=model(
-            batch_points,batch_points_mask,
-            batch_knots[:,:-1],batch_knots_mask[:,:-1],
-            batch_params[:,:-1],batch_params_mask[:,:-1])
+        with torch.cuda.amp.autocast():
+            output1,output2=model(
+                batch_points,batch_points_mask,
+                batch_knots[:,:-1],batch_knots_mask[:,:-1],
+                batch_params[:,:-1],batch_params_mask[:,:-1])
 
-        loss_knot=criterion(output1[0],batch_knots[:,1:],batch_knots_mask[:,:-1])
-        loss_params=criterion(output2[0],batch_params[:,1:], batch_params_mask[:,:-1])
-        # loss = criterion(train_output, batch_knots_left_shifted)
-        loss=loss_knot*KNOT_LOSS_WEIGHT+loss_params
+            loss_knot=criterion(output1[0],batch_knots[:,1:],batch_knots_mask[:,:-1])
+            loss_params=criterion(output2[0],batch_params[:,1:], batch_params_mask[:,:-1])
+            # loss = criterion(train_output, batch_knots_left_shifted)
+            loss=loss_knot*KNOT_LOSS_WEIGHT+loss_params
 
         loss1_avg.update(loss_knot.item()*batch_points.size(0),batch_points.size(0))
         loss2_avg.update(loss_params.item()*batch_points.size(0),batch_points.size(0))
@@ -118,8 +119,9 @@ def train(data_path,log_dir,model_save_dir):
 
         if train:
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            scaler.scale(loss).backward()  # 缩放梯度并反向传播
+            scaler.step(optimizer)         # 更新优化器
+            scaler.update()                # 更新缩放器
 
     # Training loop
     for epoch in range(epochs):
