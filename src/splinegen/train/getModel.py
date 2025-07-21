@@ -152,7 +152,7 @@ def getModel_SimpleEncoder_Knots(device='cuda',input_dim=3,internal_attention=Tr
 
      return model
 
-def getSplineGen(device='cuda',model_load_path='',base_model_load_path='',input_dim=3):
+def getSplineGen(device='cuda',model_load_path='',base_model_load_path='',input_dim=2):
 
      base_model=getModel_SimpleEncoder_Knots(device=device,model_load_path=base_model_load_path,input_dim=input_dim) 
 

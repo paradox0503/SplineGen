@@ -18,8 +18,10 @@ def train(data_path,log_dir,model_save_dir):
     # token_size=256
     dataset = CurveDataset_for_encoder(
         data_path=data_path)
-    log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_dir = model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    # log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    # model_dir = model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    log_dir=log_dir
+    model_dir = model_save_dir
                                          
     device='cuda'
     KNOT_LOSS_WEIGHT=0.3
@@ -32,7 +34,7 @@ def train(data_path,log_dir,model_save_dir):
     dropout = 0.05
     learning_rate = 0.00001 #This is very good: learning_rate = 0.0001
     # learning_rate = 0.00001 # have a test
-    epochs = 1000
+    epochs = 500
     batch_size =  256
     # Create DataLoader for training data
     print('# Create DataLoader for training data')

@@ -60,9 +60,9 @@ args = parser.parse_args()
 
 if not args.experiment_name:
     args.experiment_name = args.task
-
-results_path = pathlib.Path(__file__).parent.joinpath("results").joinpath(args.experiment_name)
-
+from pathlib import Path
+# results_path = pathlib.Path(__file__).parent.joinpath("results").joinpath(args.experiment_name)
+results_path = Path("/work") / "results" / args.experiment_name
 log_path= str(results_path.joinpath('logs'))
 model_save_path= str(results_path.joinpath('models'))
 

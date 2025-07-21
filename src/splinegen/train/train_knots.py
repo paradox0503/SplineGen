@@ -19,16 +19,18 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir):
         data_path,
         random_select_rate=None
         )
-    log_dir=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_dir = knot_model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    # log_dir=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    # model_dir = knot_model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir=log_path
+    model_dir = knot_model_save_dir
 
     device='cuda'
     p = 3
     input_dim=dataset.dimension
     learning_rate = 0.0001 #This is very good: learning_rate = 0.0001
     # learning_rate = 0.00001 # have a test
-    epochs = 1000
-    batch_size =  255
+    epochs = 500
+    batch_size =  256
     # Create DataLoader for training data
     print('# Create DataLoader for training data')
 

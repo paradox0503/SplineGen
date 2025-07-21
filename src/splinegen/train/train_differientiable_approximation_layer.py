@@ -20,7 +20,8 @@ TOKENS = {
 }
   
 def train(data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n_workers=4,n_epochs=1000,batch_size=256,lr=1e-6):
-    model_save_path=model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    # model_save_path=model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    model_save_path=model_save_path
 
 
     if not os.path.exists(model_save_path):
@@ -29,7 +30,8 @@ def train(data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n
     if not os.path.exists(log_dir):
       os.makedirs(log_dir)
 
-    writer = SummaryWriter(log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+    # writer = SummaryWriter(log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+    writer = SummaryWriter(log_dir=log_dir)
 
     torch.random.manual_seed(231)
     

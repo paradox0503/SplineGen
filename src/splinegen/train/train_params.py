@@ -14,7 +14,7 @@ TOKENS = {
 }
 
 def train(data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,
-          n_workers=4,n_epochs=1000,batch_size=256,lr=1e-4,save_epoch=5):
+          n_workers=4,n_epochs=500,batch_size=256,lr=1e-4,save_epoch=5):
     torch.random.manual_seed(231)
 
     use_cuda = True
@@ -26,8 +26,11 @@ def train(data_path,model_save_path,log_path,knot_model_load_path,train_weights=
 
     if not os.path.exists(log_path):
       os.makedirs(log_path)
-    writer = SummaryWriter(log_dir=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-    model_save_path=model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    # writer = SummaryWriter(log_dir=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+    # model_save_path=model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    writer = SummaryWriter(log_dir=log_path)
+    model_save_path=model_save_path
+
     
     dataset=CurveDataset(data_path,use_points_params=True,use_knots=True,use_orders=True,
                           random_select_rate=None)
@@ -174,10 +177,11 @@ def train(data_path,model_save_path,log_path,knot_model_load_path,train_weights=
 
         # print(f'Epoch {epoch}: Val\tLoss: {val_loss.avg:.6f} '
         #         f'\tAccuracy: {val_accuracy.avg:3.4%} '
+        import pdb;pdb.set_trace()
         if (epoch + 1) % save_epoch == 0:
             writer.flush()
             # save model every 10 epoch
-            torch.save(model.state_dict(), model_save_path+f'_epoch_{epoch}'+'.pth')
+            torch.save(model.state_dict(), model_save_path+'/'+f'epoch_{epoch+1}'+'.pth')
         #         )
         train_loss.reset()
         train_accuracy.reset()

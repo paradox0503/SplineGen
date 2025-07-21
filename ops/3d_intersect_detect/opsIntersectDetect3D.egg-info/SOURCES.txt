@@ -1,0 +1,10 @@
+pyproject.toml
+setup.py
+csrc/detect.cpp
+csrc/detect2d.cpp
+csrc/wrap.cpp
+opsIntersectDetect3D.egg-info/PKG-INFO
+opsIntersectDetect3D.egg-info/SOURCES.txt
+opsIntersectDetect3D.egg-info/dependency_links.txt
+opsIntersectDetect3D.egg-info/not-zip-safe
+opsIntersectDetect3D.egg-info/top_level.txt
