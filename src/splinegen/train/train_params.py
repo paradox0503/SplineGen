@@ -13,24 +13,29 @@ TOKENS = {
   '<eos>': 0
 }
 
-def train(data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,
-          n_workers=4,n_epochs=500,batch_size=256,lr=1e-4,save_epoch=5):
+def train(data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=256,lr=1e-4,save_epoch=5):
+    print('epoch:',n_epochs,'base_batch_size',batch_size)
     torch.random.manual_seed(231)
-
     use_cuda = True
-
-    device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
+    num_gpus = torch.cuda.device_count() if use_cuda else 0
+    print(f"Found {num_gpus} available GPUs. Using {'multi-GPU' if num_gpus > 1 else 'single-GPU'} training.")
+    device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
+    if num_gpus == 0 and use_cuda:
+        print("Warning: No GPU available, falling back to CPU.")
+    n_workers = max(8, os.cpu_count() // 2) 
 
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
 
     if not os.path.exists(log_path):
       os.makedirs(log_path)
-    # writer = SummaryWriter(log_dir=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-    # model_save_path=model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     writer = SummaryWriter(log_dir=log_path)
     model_save_path=model_save_path
-
+    if 'h100' in torch.cuda.get_device_name(0).lower():
+        base_batch_size = 2048  # H100可以处理更大batch
+    else:
+        base_batch_size = 512  # 4090保持原有值
+    batch_size = base_batch_size * num_gpus
     
     dataset=CurveDataset(data_path,use_points_params=True,use_knots=True,use_orders=True,
                           random_select_rate=None)
@@ -44,11 +49,20 @@ def train(data_path,model_save_path,log_path,knot_model_load_path,train_weights=
 
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-      num_workers=n_workers)
+      num_workers=n_workers,pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
-      num_workers=n_workers,shuffle=False)
+      num_workers=n_workers,shuffle=False,pin_memory=True)
 
-    model=getModel.getModel_SimpleEncoder_Knots(device=device,knot_load_path=knot_model_load_path,input_dim=input_dim)
+    # model=getModel.getModel_SimpleEncoder_Knots(device=device,knot_load_path=knot_model_load_path,input_dim=input_dim)
+    model = getModel.getModel_SimpleEncoder_Knots(
+        device='cuda:0' if num_gpus > 0 else 'cpu',  # 先加载到主GPU
+        knot_load_path=knot_model_load_path,
+        input_dim=input_dim
+    )
+    if num_gpus > 1:
+        model = torch.nn.DataParallel(model)
+        model = model.to(device)  # 移动到主GPU
+        print(f"Model wrapped with DataParallel, using {num_gpus} GPUs")
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -177,11 +191,14 @@ def train(data_path,model_save_path,log_path,knot_model_load_path,train_weights=
 
         # print(f'Epoch {epoch}: Val\tLoss: {val_loss.avg:.6f} '
         #         f'\tAccuracy: {val_accuracy.avg:3.4%} '
-        import pdb;pdb.set_trace()
         if (epoch + 1) % save_epoch == 0:
             writer.flush()
             # save model every 10 epoch
-            torch.save(model.state_dict(), model_save_path+'/'+f'epoch_{epoch+1}'+'.pth')
+            if num_gpus > 1:
+                state_dict = model.module.state_dict()
+            else:
+                state_dict = model.state_dict()
+            torch.save(state_dict, model_save_path+f'_epoch_{epoch}'+'.pth')
         #         )
         train_loss.reset()
         train_accuracy.reset()

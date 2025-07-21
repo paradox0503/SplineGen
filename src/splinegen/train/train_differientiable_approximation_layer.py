@@ -20,7 +20,18 @@ TOKENS = {
 }
   
 def train(data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n_workers=4,n_epochs=1000,batch_size=256,lr=1e-6):
-    # model_save_path=model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    print('epoch:',n_epochs,'base_batch_size',batch_size)
+    num_gpus = torch.cuda.device_count() if use_cuda else 0
+    print(f"Found {num_gpus} available GPUs. Using {'multi-GPU' if num_gpus > 1 else 'single-GPU'} training.")
+    device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
+    if num_gpus == 0 and use_cuda:
+        print("Warning: No GPU available, falling back to CPU.")
+    if 'h100' in torch.cuda.get_device_name(0).lower():
+        base_batch_size = 2048  # H100可以处理更大batch
+    else:
+        base_batch_size = 512  # 4090保持原有值
+    batch_size = base_batch_size * num_gpus
+
     model_save_path=model_save_path
 
 
@@ -42,13 +53,21 @@ def train(data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n
     print(f'# val:   {len(dataset):7d}')
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-      num_workers=n_workers,shuffle=True)
+      num_workers=n_workers,shuffle=True,pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
-      num_workers=n_workers,shuffle=False)
+      num_workers=n_workers,shuffle=False,pin_memory=True)
 
-    device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 
-    model=getModel.getSplineGen(device=device,base_model_load_path=base_model_load_path,input_dim=dataset.dimension)
+    # model=getModel.getSplineGen(device=device,base_model_load_path=base_model_load_path,input_dim=dataset.dimension)
+    model = getModel.getSplineGen(
+        device='cuda:0' if num_gpus > 0 else 'cpu',
+        base_model_load_path=base_model_load_path,
+        input_dim=dataset.dimension
+    )
+    if num_gpus > 1:
+        model = torch.nn.DataParallel(model)
+        model = model.to(device)
+        print(f"Model wrapped with DataParallel, using {num_gpus} GPUs")
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     def knots_loss_fn(knots_pred, knots, knots_mask):
@@ -174,7 +193,11 @@ def train(data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n
         if (epoch + 1) % 5 == 0:
             writer.flush()
             # save model every 10 epoch
-            torch.save(model.state_dict(), model_save_path+f'/epoch_{epoch+1}'+'.pth')
+            if num_gpus > 1:
+                state_dict = model.module.state_dict()
+            else:
+                state_dict = model.state_dict()
+            torch.save(state_dict, model_save_path+f'/epoch_{epoch+1}'+'.pth')
                   
         writer.add_scalar('Train/Loss',train_loss.avg,epoch+1)
         writer.add_scalar('Train/Accuracy',train_accuracy.avg,epoch+1)

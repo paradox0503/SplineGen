@@ -14,7 +14,14 @@ import train.getModel as getModel
 
 # if __name__ == '__main__':
 # 
-def train(data_path,log_path,encoder_path,knot_model_save_dir):
+def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs,base_batch_size):
+    print('epoch:',epochs,'base_batch_size',base_batch_size)
+
+    num_gpus = torch.cuda.device_count()
+    print(f"Found {num_gpus} available GPUs. Using multi-GPU training.")
+    if num_gpus == 0:
+        raise ValueError("No GPU available. Please check CUDA configuration.")
+    n_workers = max(8, os.cpu_count() // 2) 
     dataset = CurveDataset(
         data_path,
         random_select_rate=None
@@ -23,22 +30,25 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir):
     # model_dir = knot_model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     log_dir=log_path
     model_dir = knot_model_save_dir
-
     device='cuda'
     p = 3
     input_dim=dataset.dimension
     learning_rate = 0.0001 #This is very good: learning_rate = 0.0001
     # learning_rate = 0.00001 # have a test
-    epochs = 500
-    batch_size =  256
+    batch_size = base_batch_size * num_gpus  # 总batch size = 单GPU batch size × GPU数量
     # Create DataLoader for training data
     print('# Create DataLoader for training data')
 
     train_dataset,val_dataset=random_split(dataset,[int(len(dataset)*0.8),len(dataset)-int(len(dataset)*0.8)],generator=torch.Generator().manual_seed(42))
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,num_workers=n_workers, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True,num_workers=n_workers, pin_memory=True)
 
-    model=getModel.getModel_Simple(device=device,encoder_load_path=encoder_path,input_dim=input_dim)
+    # model=getModel.getModel_Simple(device=device,encoder_load_path=encoder_path,input_dim=input_dim)
+    model = getModel.getModel_Simple(device='cuda:0', encoder_load_path=encoder_path, input_dim=input_dim)
+    if num_gpus > 1:
+        model = torch.nn.DataParallel(model)  # 自动分发到所有GPU
+        model = model.to(device)  # 移动到主GPU
+        print(f"Using {num_gpus} GPUs for training.")
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     def loss_fn(knots_pred, knots, knots_mask):
@@ -106,7 +116,8 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir):
 
         # Save model every 50 epochs
         if (epoch + 1) % 10 == 0:
-            torch.save(model.state_dict(), f'{model_dir}/epoch_{epoch + 1}.pth')
+            state_dict = model.module.state_dict() if num_gpus > 1 else model.state_dict()
+            torch.save(state_dict, f'{model_dir}/epoch_{epoch + 1}.pth')
             print(f"Model saved at epoch {epoch + 1}")
 
     print("Training complete.")

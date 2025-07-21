@@ -14,14 +14,19 @@ import datetime
 from dataset.curveDataset_for_encoder import CurveDataset_for_encoder
 from torch.utils.data import random_split
 
-def train(data_path,log_dir,model_save_dir):
-    # token_size=256
+def train(data_path,log_dir,model_save_dir,epochs,base_batch_size):
+    print('epoch:',epochs,'base_batch_size',base_batch_size)
+    num_gpus = torch.cuda.device_count()
+    print(f"Found {num_gpus} available GPUs. Using multi-GPU training.")
+    if num_gpus == 0:
+        raise ValueError("No GPU available. Please check CUDA configuration.")
+    
     dataset = CurveDataset_for_encoder(
         data_path=data_path)
-    # log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    # model_dir = model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
     log_dir=log_dir
     model_dir = model_save_dir
+
+    n_workers = max(8, os.cpu_count() // 2)
                                          
     device='cuda'
     KNOT_LOSS_WEIGHT=0.3
@@ -32,16 +37,16 @@ def train(data_path,log_dir,model_save_dir):
     num_decoder_layers = 3
     dim_feedforward = 2048
     dropout = 0.05
-    learning_rate = 0.00001 #This is very good: learning_rate = 0.0001
+    learning_rate = 0.0001 #This is very good: learning_rate = 0.0001
     # learning_rate = 0.00001 # have a test
-    epochs = 500
-    batch_size =  256
+    batch_size = base_batch_size * num_gpus
+
     # Create DataLoader for training data
     print('# Create DataLoader for training data')
 
     train_dataset,val_dataset=random_split(dataset,[int(len(dataset)*0.8),len(dataset)-int(len(dataset)*0.8)],generator=torch.Generator().manual_seed(42))
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,num_workers=n_workers, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size,shuffle=True,num_workers=n_workers, pin_memory=True)
 
     input_dim=dataset.dimension
 
@@ -69,6 +74,11 @@ def train(data_path,log_dir,model_save_dir):
 
     model=models.encoder_decoder.PointsEncoderDecoder2(points_encoder,decoder1,decoder2,masking_rate=None).to(device)
 
+    # 多GPU包装：自动将模型分发到所有可用GPU
+    if num_gpus > 1:
+        model = torch.nn.DataParallel(model)
+        print(f"Using {num_gpus} GPUs for training.")
+
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     def loss_fn(knots_pred, knots, knots_mask):
@@ -90,8 +100,9 @@ def train(data_path,log_dir,model_save_dir):
     # Get a list of all existing model files
 
     # TensorBoard setup
+    torch.backends.cuda.matmul.allow_tf32 = True
     writer = SummaryWriter(log_dir=log_dir)
-
+    scaler = torch.cuda.amp.GradScaler()
     def train_step(model,
                    batch,loss_avg:AverageMeter,
                    loss1_avg:AverageMeter,
@@ -104,15 +115,16 @@ def train(data_path,log_dir,model_save_dir):
         batch_params = batch['params_expanded'].to(device)
         batch_params_mask = batch['params_mask_expanded'].to(device)
 
-        output1,output2=model(
-            batch_points,batch_points_mask,
-            batch_knots[:,:-1],batch_knots_mask[:,:-1],
-            batch_params[:,:-1],batch_params_mask[:,:-1])
+        with torch.cuda.amp.autocast():
+            output1,output2=model(
+                batch_points,batch_points_mask,
+                batch_knots[:,:-1],batch_knots_mask[:,:-1],
+                batch_params[:,:-1],batch_params_mask[:,:-1])
 
-        loss_knot=criterion(output1[0],batch_knots[:,1:],batch_knots_mask[:,:-1])
-        loss_params=criterion(output2[0],batch_params[:,1:], batch_params_mask[:,:-1])
-        # loss = criterion(train_output, batch_knots_left_shifted)
-        loss=loss_knot*KNOT_LOSS_WEIGHT+loss_params
+            loss_knot=criterion(output1[0],batch_knots[:,1:],batch_knots_mask[:,:-1])
+            loss_params=criterion(output2[0],batch_params[:,1:], batch_params_mask[:,:-1])
+            # loss = criterion(train_output, batch_knots_left_shifted)
+            loss=loss_knot*KNOT_LOSS_WEIGHT+loss_params
 
         loss1_avg.update(loss_knot.item()*batch_points.size(0),batch_points.size(0))
         loss2_avg.update(loss_params.item()*batch_points.size(0),batch_points.size(0))
@@ -120,8 +132,9 @@ def train(data_path,log_dir,model_save_dir):
 
         if train:
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            scaler.scale(loss).backward()  # 缩放梯度并反向传播
+            scaler.step(optimizer)         # 更新优化器
+            scaler.update()                # 更新缩放器
 
     # Training loop
     for epoch in range(epochs):
@@ -172,9 +185,10 @@ def train(data_path,log_dir,model_save_dir):
         writer.add_scalar('Validation/Knot/Loss', val_loss1, epoch)
         writer.add_scalar('Validation/Param/Loss', val_loss2, epoch)
 
-        # Save model every 50 epochs
+        # Save model every 10 epochs
         if (epoch + 1) % 10 == 0:
-            torch.save(model.state_dict(), f'{model_dir}epoch_{epoch + 1}.pth')
+            state_dict = model.module.state_dict() if num_gpus > 1 else model.state_dict()
+            torch.save(state_dict, f'{model_dir}epoch_{epoch + 1}.pth')
             print(f"Model saved at epoch {epoch + 1}")
 
     print("Training complete.")
