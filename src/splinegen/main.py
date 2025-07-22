@@ -60,14 +60,21 @@ parser.add_argument(
     default=1000,
     help="Experiment name (used to create folder inside ./results/ to save logs and models), default is task name",
 )
-
-# parser = Trainer.add_argparse_args(parser)
+parser.add_argument(
+    "--save",
+    type=bool,
+    default=False,
+)
+parser.add_argument(
+    "--reuse",
+    type=bool,
+    default=False,
+)
 args = parser.parse_args()
 
 if not args.experiment_name:
     args.experiment_name = args.task
 from pathlib import Path
-# results_path = pathlib.Path(__file__).parent.joinpath("results").joinpath(args.experiment_name)
 results_path = Path("/work") / "results" / args.experiment_name
 log_path= str(results_path.joinpath('logs'))
 model_save_path= str(results_path.joinpath('models'))
@@ -76,16 +83,16 @@ if not results_path.exists():
     results_path.mkdir(parents=True, exist_ok=True)
 
 if args.task=='train_encoder':
-    train.train_encoder.train(args.dataset_path,log_path,model_save_path,args.epoch,args.batch_size)
+    train.train_encoder.train(args.dataset_path,log_path,model_save_path,args.epoch,args.batch_size,args.save,args.reuse)
 
 elif args.task=='train_knot_decoder':
-    train.train_knots.train(args.dataset_path,log_path,args.encoder_path,model_save_path,args.epoch,args.batch_size)
+    train.train_knots.train(args.dataset_path,log_path,args.encoder_path,model_save_path,args.epoch,args.batch_size,args.save)
 
 elif args.task=='train_param_decoder':
-    train.train_params.train(args.dataset_path,model_save_path,log_path,args.knot_path,n_epochs=args.epoch,batch_size=args.batch_size)
+    train.train_params.train(args.save,args.dataset_path,model_save_path,log_path,args.knot_path,n_epochs=args.epoch,batch_size=args.batch_size)
 
 elif args.task=='train_diff_approximation':
-    train.train_differientiable_approximation_layer.train(args.dataset_path,log_path,model_save_path,args.base_model_path,n_epochs=args.epoch,batch_size=args.batch_size)
+    train.train_differientiable_approximation_layer.train(args.save,args.dataset_path,log_path,model_save_path,args.base_model_path,n_epochs=args.epoch,batch_size=args.batch_size)
 
 elif args.task=='test':
     train.eval.eval(args.dataset_path,args.model_path)

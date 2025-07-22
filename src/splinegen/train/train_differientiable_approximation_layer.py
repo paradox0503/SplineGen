@@ -19,7 +19,7 @@ TOKENS = {
   '<eos>': 0
 }
   
-def train(data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n_workers=4,n_epochs=1000,batch_size=256,lr=1e-6):
+def train(ifsave,data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n_workers=4,n_epochs=1000,batch_size=256,lr=1e-6):
     print('epoch:',n_epochs,'base_batch_size',batch_size)
     num_gpus = torch.cuda.device_count() if use_cuda else 0
     print(f"Found {num_gpus} available GPUs. Using {'multi-GPU' if num_gpus > 1 else 'single-GPU'} training.")
@@ -122,11 +122,11 @@ def train(data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n
         for bat, input in enumerate(tqdm(train_loader)):
             batch_labels = input['targets'].to(device)
             batch_lengths = input['length'].to(device)
-            batch_mask=input['points_mask'].to(device)
+            batch_mask=input['points_mask'].to(device).bool() 
             batch_params=input['params'].to(device=device,dtype=torch.float32)
             batch_points=input['points'].to(device)
             batch_knots=input['knots_expanded'].to(device)
-            batch_knots_mask=input['knots_mask_expanded'].to(device)
+            batch_knots_mask=input['knots_mask_expanded'].to(device).bool() 
 
             optimizer.zero_grad()
 

@@ -14,7 +14,7 @@ import train.getModel as getModel
 
 # if __name__ == '__main__':
 # 
-def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs,base_batch_size):
+def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs,base_batch_size,ifsave):
     print('epoch:',epochs,'base_batch_size',base_batch_size)
 
     num_gpus = torch.cuda.device_count()
@@ -113,7 +113,10 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs,base_batch_
 
         print(f"Epoch {epoch + 1}/{epochs},Validation Loss: {val_loss}")
         writer.add_scalar('Validation/Loss', val_loss, epoch)
-
+        if ifsave and epoch==0:
+            state_dict = model.module.state_dict() if num_gpus > 1 else model.state_dict()
+            torch.save(state_dict, f'{model_dir}/epoch_{epoch + 1}.pth')
+            print(f"Model saved at epoch {epoch + 1}")
         # Save model every 50 epochs
         if (epoch + 1) % 10 == 0:
             state_dict = model.module.state_dict() if num_gpus > 1 else model.state_dict()

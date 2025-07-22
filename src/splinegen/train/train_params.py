@@ -13,7 +13,7 @@ TOKENS = {
   '<eos>': 0
 }
 
-def train(data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=256,lr=1e-4,save_epoch=5):
+def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=256,lr=1e-4,save_epoch=5):
     print('epoch:',n_epochs,'base_batch_size',batch_size)
     torch.random.manual_seed(231)
     use_cuda = True
@@ -191,6 +191,10 @@ def train(data_path,model_save_path,log_path,knot_model_load_path,train_weights=
 
         # print(f'Epoch {epoch}: Val\tLoss: {val_loss.avg:.6f} '
         #         f'\tAccuracy: {val_accuracy.avg:3.4%} '
+        if ifsave and epoch==0:
+            state_dict = model.module.state_dict() if num_gpus > 1 else model.state_dict()
+            torch.save(state_dict, f'{model_save_path}/epoch_{epoch + 1}.pth')
+            print(f"Model saved at epoch {epoch + 1}")
         if (epoch + 1) % save_epoch == 0:
             writer.flush()
             # save model every 10 epoch
