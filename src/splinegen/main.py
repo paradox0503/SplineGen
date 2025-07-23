@@ -64,6 +64,11 @@ parser.add_argument(
     type=bool,
     default=False,
 )
+parser.add_argument(
+    "--reuse",
+    type=str,
+    default=None,
+)
 
 # parser = Trainer.add_argparse_args(parser)
 args = parser.parse_args()
@@ -80,7 +85,7 @@ if not results_path.exists():
     results_path.mkdir(parents=True, exist_ok=True)
 
 if args.task=='train_encoder':
-    train.train_encoder.train(args.dataset_path,log_path,model_save_path,args.epoch,args.batch_size,args.save)
+    train.train_encoder.train(args.dataset_path,log_path,model_save_path,args.epoch,args.batch_size,args.save,resume_from=args.reuse)
 
 elif args.task=='train_knot_decoder':
     train.train_knots.train(args.dataset_path,log_path,args.encoder_path,model_save_path,args.epoch,args.batch_size,args.save)

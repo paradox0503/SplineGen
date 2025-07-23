@@ -14,7 +14,7 @@ import datetime
 from dataset.curveDataset_for_encoder import CurveDataset_for_encoder
 from torch.utils.data import random_split
 
-def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave):
+def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_from=None):
     num_gpus = torch.cuda.device_count()
     print(f"Found {num_gpus} available GPUs. Using multi-GPU training.")
     if num_gpus == 0:
@@ -84,6 +84,40 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
+
+    # 添加断点续训逻辑
+    start_epoch = 0
+    if resume_from is not None:
+        # 如果 resume_from 不是绝对路径，则在 model_dir 中查找
+        if not os.path.isabs(resume_from):
+            resume_path = os.path.join(model_dir, resume_from)
+        else:
+            resume_path = resume_from
+        
+        print(f"Looking for checkpoint at: {resume_path}")
+        print(f"Model directory: {model_dir}")
+        print(f"Resume from: {resume_from}")
+            
+        if os.path.exists(resume_path):
+            print(f"Loading checkpoint from {resume_path}")
+            checkpoint = torch.load(resume_path, map_location=device)
+            
+            # 加载模型状态
+            if num_gpus > 1:
+                model.module.load_state_dict(checkpoint['model_state_dict'])
+            else:
+                model.load_state_dict(checkpoint['model_state_dict'])
+            
+            # 加载优化器状态
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            
+            # 加载训练轮次
+            start_epoch = checkpoint['epoch']
+            
+            print(f"Resumed training from epoch {start_epoch}")
+        else:
+            print(f"Checkpoint file {resume_path} not found. Starting from scratch.")
+    
     def loss_fn(knots_pred, knots, knots_mask):
         loss = torch.nn.functional.mse_loss(knots_pred, knots, reduction='none')
         
@@ -140,7 +174,7 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave):
             scaler.update()                # 更新缩放器
 
     # Training loop
-    for epoch in range(epochs):
+    for epoch in range(start_epoch,epochs):
 
         train_loss1_recoder=AverageMeter()
         val_loss1_recoder=AverageMeter()
@@ -187,15 +221,52 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave):
         writer.add_scalar('Validation/Total/Loss', val_loss, epoch)
         writer.add_scalar('Validation/Knot/Loss', val_loss1, epoch)
         writer.add_scalar('Validation/Param/Loss', val_loss2, epoch)
+        
+        # 保存 checkpoint
         if ifsave:
-            state_dict = model.module.state_dict() if num_gpus > 1 else model.state_dict()
-            torch.save(state_dict, f'{model_dir}epoch_{epoch + 1}.pth')
-            print(f"Model saved at epoch {epoch + 1}")
-        # Save model every 10 epochs
+            checkpoint = {
+                'epoch': epoch + 1,
+                'model_state_dict': model.module.state_dict() if num_gpus > 1 else model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_loss': train_loss,
+                'val_loss': val_loss,
+            }
+            torch.save(checkpoint, f'{model_dir}/checkpoint_epoch_{epoch + 1}.pth')
+            print(f"Checkpoint saved at epoch {epoch + 1}")
+            
+        # Save model every 10 epochs (额外保存)
         if (epoch + 1) % 10 == 0:
-            state_dict = model.module.state_dict() if num_gpus > 1 else model.state_dict()
-            torch.save(state_dict, f'{model_dir}epoch_{epoch + 1}.pth')
-            print(f"Model saved at epoch {epoch + 1}")
+            checkpoint = {
+                'epoch': epoch + 1,
+                'model_state_dict': model.module.state_dict() if num_gpus > 1 else model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_loss': train_loss,
+                'val_loss': val_loss,
+            }
+            torch.save(checkpoint, f'{model_dir}/checkpoint_epoch_{epoch + 1}.pth')
+            print(f"Checkpoint saved at epoch {epoch + 1}")
+    
 
     print("Training complete.")
     writer.close()
+
+def find_latest_checkpoint(model_dir):
+    """查找最新的checkpoint文件"""
+    if not os.path.exists(model_dir):
+        return None
+    
+    checkpoint_files = []
+    for file in os.listdir(model_dir):
+        if file.startswith('checkpoint_epoch_') and file.endswith('.pth'):
+            # 提取epoch数字
+            match = re.search(r'checkpoint_epoch_(\d+)\.pth', file)
+            if match:
+                epoch_num = int(match.group(1))
+                checkpoint_files.append((epoch_num, os.path.join(model_dir, file)))
+    
+    if checkpoint_files:
+        # 返回最新的checkpoint文件路径
+        latest_checkpoint = max(checkpoint_files, key=lambda x: x[0])
+        return latest_checkpoint[1]
+    
+    return None
