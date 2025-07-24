@@ -20,17 +20,14 @@ TOKENS = {
   '<eos>': 0
 }
   
-def train(ifsave,data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n_workers=0,n_epochs=1000,batch_size=256,lr=1e-6,resume_from=None):
+def train(ifsave,data_path,log_dir,model_save_path,base_model_load_path,use_cuda=True,n_workers=0,n_epochs=1000,batch_size=512,lr=1e-6,resume_from=None):
     print('epoch:',n_epochs,'base_batch_size',batch_size)
     num_gpus = torch.cuda.device_count() if use_cuda else 0
     print(f"Found {num_gpus} available GPUs. Using {'multi-GPU' if num_gpus > 1 else 'single-GPU'} training.")
     device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
     if num_gpus == 0 and use_cuda:
         print("Warning: No GPU available, falling back to CPU.")
-    # if 'h100' in torch.cuda.get_device_name(0).lower():
-    #     base_batch_size = 2048  # H100可以处理更大batch
-    # else:
-    #     base_batch_size = 512  # 4090保持原有值
+
     batch_size = batch_size * num_gpus
 
     model_save_path=model_save_path

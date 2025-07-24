@@ -137,11 +137,19 @@ def getModel_SimpleEncoder_Knots(device='cuda',input_dim=3,internal_attention=Tr
      model=new_model
 
      if model_load_path:
-          model.load_state_dict(torch.load(model_load_path))
+          checkpoint = torch.load(model_load_path)
+          # 提取信息
+          model_params = checkpoint["model_state_dict"]  # 模型参数
+          # 加载到模型和优化器
+          model.load_state_dict(model_params)
+          # model.load_state_dict(torch.load(model_load_path))
           print("Whole model loaded")
      else:
           if knot_load_path:
-               states=torch.load(knot_load_path)
+               checkpoint = torch.load(knot_load_path)
+               # 提取信息
+               states = checkpoint["model_state_dict"]  # 模型参数
+               # states=torch.load(knot_load_path)
                new_states={}
                for key in states:
                     if key.startswith('encoder'):

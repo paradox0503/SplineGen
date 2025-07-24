@@ -14,7 +14,7 @@ import train.getModel as getModel
 
 # if __name__ == '__main__':
 # 
-def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs,base_batch_size,ifsave,resume_from=None):
+def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs=1000,base_batch_size=512,ifsave=False,resume_from=None):
     print('epoch:',epochs,'base_batch_size',base_batch_size)
 
     num_gpus = torch.cuda.device_count()
@@ -29,8 +29,8 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs,base_batch_
         )
     # log_dir=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     # model_dir = knot_model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_dir=log_path
-    model_dir = knot_model_save_dir
+    log_dir=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    model_dir = knot_model_save_dir+'/'
     device='cuda'
     p = 3
     input_dim=dataset.dimension
@@ -157,7 +157,7 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs,base_batch_
                 'train_loss': train_loss,
                 'val_loss': val_loss,
             }
-            torch.save(checkpoint, f'{model_dir}/epoch_{epoch + 1}.pth')
+            torch.save(checkpoint, f'{model_dir}epoch_{epoch + 1}.pth')
             print(f"Checkpoint saved at epoch {epoch + 1}")
             
         # Save model every 10 epochs (额外保存)
@@ -169,7 +169,7 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs,base_batch_
                 'train_loss': train_loss,
                 'val_loss': val_loss,
             }
-            torch.save(checkpoint, f'{model_dir}/epoch_{epoch + 1}.pth')
+            torch.save(checkpoint, f'{model_dir}epoch_{epoch + 1}.pth')
             print(f"Checkpoint saved at epoch {epoch + 1}")
 
     print("Training complete.")

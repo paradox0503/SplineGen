@@ -69,6 +69,11 @@ parser.add_argument(
     type=str,
     default=None,
 )
+parser.add_argument(
+    "--result_dir",
+    type=str,
+    default=None,
+)
 
 # parser = Trainer.add_argparse_args(parser)
 args = parser.parse_args()
@@ -76,8 +81,11 @@ args = parser.parse_args()
 if not args.experiment_name:
     args.experiment_name = args.task
 from pathlib import Path
-# results_path = pathlib.Path(__file__).parent.joinpath("results").joinpath(args.experiment_name)
-results_path = Path("/work") / "results" / args.experiment_name
+if args.result_dir:
+    results_path = Path(args.result_dir).joinpath(args.experiment_name)
+else:
+    results_path = pathlib.Path(__file__).parent.joinpath("results").joinpath(args.experiment_name)
+    # results_path = Path("/work") / "results" / args.experiment_name
 log_path= str(results_path.joinpath('logs'))
 model_save_path= str(results_path.joinpath('models'))
 

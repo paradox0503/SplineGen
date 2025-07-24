@@ -23,9 +23,10 @@ class PointsEncoder(nn.Module):
         '''
             x: [batch,seq_len,hidden_dim]
         '''
-        x=coordinates_positional_encoding(x,self.L)
+        # import pdb;pdb.set_trace()
+        x=coordinates_positional_encoding(x,self.L)# torch.Size([32, 50, 40])
         # torch._assert(x.shape[1]==mask.shape[1],f"the length of x and mask should be the same, but got {x.shape[1]} and {mask.shape[1]}")
-        x=self.linear_projection(x)
+        x=self.linear_projection(x)# torch.Size([32, 50, 512])
         x=self.dropout(x)
         # x=self.position_encoder(x)
         x_ = self.encoder(x,src_key_padding_mask=torch.logical_not(mask))
@@ -49,19 +50,19 @@ def coordinates_positional_encoding(x, L=10):
     """
 
     # Create a list of frequencies
-    frequencies = 2.0 ** torch.arange(0, L, dtype=x.dtype, device=x.device)
+    frequencies = 2.0 ** torch.arange(0, L, dtype=x.dtype, device=x.device)# tensor([  1.,   2.,   4.,   8.,  16.,  32.,  64., 128., 256., 512.], device='cuda:0')
 
     # View the frequencies to make them broadcastable with x
     frequencies = frequencies.view(*([1] * len(x.shape)), L)
 
     # Apply the positional encoding by concatenating sines and cosines
     x_expanded = x[..., None] * frequencies  # Shape: [..., L, D]
-    x_encoded = torch.cat([torch.sin(x_expanded), torch.cos(x_expanded)], dim=-1)
+    x_encoded = torch.cat([torch.sin(x_expanded), torch.cos(x_expanded)], dim=-1)# torch.Size([32, 50, 2, 20])
     
     # Reshape the encoded tensor to have the correct size
     # shape = list(x.shape[:-1]) + [-1]
     # x_encoded = x_encoded.reshape(shape)
-    x_encoded = x_encoded.flatten(start_dim=-2)
+    x_encoded = x_encoded.flatten(start_dim=-2)# torch.Size([32, 50, 40])
 
     return x_encoded
 

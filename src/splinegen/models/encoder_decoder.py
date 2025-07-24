@@ -35,7 +35,7 @@ class PointsEncoderDecoder2(nn.Module):
             src_mask=self.dropout(src_mask.float()).bool()
         decoder_output1=self.decoder1(encoder_output,src_mask,tgt1,tgt1_mask)
         decoder_output2=self.decoder2(encoder_output,src_mask,tgt2,tgt2_mask)
-        return decoder_output1,decoder_output2
+        return decoder_output1,decoder_output2 #两个元组，每个里面包含knot和transformer_output（预测的点）
 
 def pad_item_torch(
     points: torch.Tensor,

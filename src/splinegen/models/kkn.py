@@ -71,7 +71,7 @@ class KPN_Discrete(nn.Module):
 
         return knots
 
-class KPN(nn.Module):
+class KPN(nn.Module):# knot prediction network
 
     def __init__(self, d_model, nhead, num_decoder_layers, dim_feedforward, dropout,output_dim=3 ):
 
@@ -116,6 +116,7 @@ class KPN(nn.Module):
         *SOS means Start of Sentence
         *EOS means End of Sentence
         '''
+        # import pdb;pdb.set_trace()
         
         src_key_padding_mask = ~src_mask_position
         tgt_key_padding_mask = ~tgt_mask_position
@@ -183,7 +184,9 @@ class KPN(nn.Module):
         # ones = torch.ones(src.size(0), self.p + 1, device=src.device)
         # knots = torch.cat([zeros, interior_knots, ones], dim=-1)
 
-        return knots,transformer_output
+        return knots,transformer_output 
+    # p knots.shape torch.Size([32, 29, 3])
+    #(Pdb) p transformer_output.shape torch.Size([32, 29, 512])
 
 class KPN2(nn.Module):
 

@@ -14,7 +14,7 @@ TOKENS = {
   '<eos>': 0
 }
 
-def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=256,lr=1e-4,save_epoch=5,resume_from=None):
+def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=512,lr=1e-4,save_epoch=5,resume_from=None):
     print('epoch:',n_epochs,'base_batch_size',batch_size)
     torch.random.manual_seed(231)
     use_cuda = True
@@ -25,7 +25,8 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
         print("Warning: No GPU available, falling back to CPU.")
     # n_workers = max(8, os.cpu_count() // 2) 
     n_workers = 4
-
+    log_path=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    model_save_path = model_save_path+'/'
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
 
@@ -33,11 +34,7 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
       os.makedirs(log_path)
     writer = SummaryWriter(log_dir=log_path)
     model_save_path=model_save_path
-    if 'h100' in torch.cuda.get_device_name(0).lower():
-        base_batch_size = 2048  # H100可以处理更大batch
-    else:
-        base_batch_size = 512  # 4090保持原有值
-    batch_size = base_batch_size * num_gpus
+    batch_size = batch_size * num_gpus
     
     dataset=CurveDataset(data_path,use_points_params=True,use_knots=True,use_orders=True,
                           random_select_rate=None)
@@ -244,7 +241,7 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
                 'train_accuracy': train_accuracy.avg,
                 'val_accuracy': val_accuracy.avg,
             }
-            torch.save(checkpoint, model_save_path+f'_epoch_{epoch}'+'.pth')
+            torch.save(checkpoint, model_save_path+f'epoch_{epoch+1}'+'.pth')
             print(f"Checkpoint saved at epoch {epoch + 1}")
             
         if ifsave:
@@ -261,7 +258,7 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
                 'train_accuracy': train_accuracy.avg,
                 'val_accuracy': val_accuracy.avg,
             }
-            torch.save(checkpoint, model_save_path+f'_epoch_{epoch}'+'.pth')
+            torch.save(checkpoint, model_save_path+f'epoch_{epoch+1}'+'.pth')
             print(f"Checkpoint saved at epoch {epoch + 1}")
         #         )
         train_loss.reset()
@@ -283,7 +280,7 @@ def find_latest_checkpoint(model_dir):
     for file in os.listdir(model_dir):
         if 'epoch_' in file and file.endswith('.pth'):
             # 提取epoch数字，适配当前文件名格式 model_save_path_epoch_X.pth
-            match = re.search(r'_epoch_(\d+)\.pth', file)
+            match = re.search(r'epoch_(\d+)\.pth', file)
             if match:
                 epoch_num = int(match.group(1))
                 checkpoint_files.append((epoch_num, os.path.join(model_dir, file)))

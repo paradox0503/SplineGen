@@ -22,8 +22,8 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_
     
     dataset = CurveDataset_for_encoder(
         data_path=data_path)
-    log_dir=log_dir
-    model_dir = model_save_dir
+    log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    model_dir = model_save_dir+'/'
     n_workers = 4
                                          
     device='cuda'
@@ -226,7 +226,7 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_
                 'train_loss': train_loss,
                 'val_loss': val_loss,
             }
-            torch.save(checkpoint, f'{model_dir}/epoch_{epoch + 1}.pth')
+            torch.save(checkpoint, f'{model_dir}epoch_{epoch + 1}.pth')
             print(f"Checkpoint saved at epoch {epoch + 1}")
             
         # Save model every 10 epochs (额外保存)
@@ -238,7 +238,7 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_
                 'train_loss': train_loss,
                 'val_loss': val_loss,
             }
-            torch.save(checkpoint, f'{model_dir}/epoch_{epoch + 1}.pth')
+            torch.save(checkpoint, f'{model_dir}epoch_{epoch + 1}.pth')
             print(f"Checkpoint saved at epoch {epoch + 1}")
     
 
