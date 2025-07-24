@@ -48,11 +48,19 @@ def getModel_Simple(device='cuda',encoder_load_path=None,model_load_path=None,in
      model=models.encoder_decoder.PointsEncoderDecoder(points_encoder,decoder,lock_encoder=True).to(device)
 
      if model_load_path:
-          model.load_state_dict(torch.load(model_load_path))
+          checkpoint = torch.load(model_load_path)
+          # 提取信息
+          model_params = checkpoint["model_state_dict"]  # 模型参数
+          # 加载到模型和优化器
+          model.load_state_dict(model_params)
+          # model.load_state_dict(torch.load(model_load_path))
           print("Whole model loaded")
      else:
           if encoder_load_path:
-               states=torch.load(encoder_load_path)
+               checkpoint = torch.load(encoder_load_path)
+               # 提取信息
+               states = checkpoint["model_state_dict"]  # 模型参数
+               # states=torch.load(encoder_load_path)
                new_states={}
                for key in states:
                     if key.startswith('encoder'):

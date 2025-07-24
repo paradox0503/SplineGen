@@ -88,13 +88,13 @@ if args.task=='train_encoder':
     train.train_encoder.train(args.dataset_path,log_path,model_save_path,args.epoch,args.batch_size,args.save,resume_from=args.reuse)
 
 elif args.task=='train_knot_decoder':
-    train.train_knots.train(args.dataset_path,log_path,args.encoder_path,model_save_path,args.epoch,args.batch_size,args.save)
+    train.train_knots.train(args.dataset_path,log_path,args.encoder_path,model_save_path,args.epoch,args.batch_size,args.save,resume_from=args.reuse)
 
 elif args.task=='train_param_decoder':
-    train.train_params.train(args.save,args.dataset_path,model_save_path,log_path,args.knot_path,n_epochs=args.epoch,batch_size=args.batch_size)
+    train.train_params.train(args.save,args.dataset_path,model_save_path,log_path,args.knot_path,n_epochs=args.epoch,batch_size=args.batch_size,resume_from=args.reuse)
 
 elif args.task=='train_diff_approximation':
-    train.train_differientiable_approximation_layer.train(args.save,args.dataset_path,log_path,model_save_path,args.base_model_path,n_epochs=args.epoch,batch_size=args.batch_size)
+    train.train_differientiable_approximation_layer.train(args.save,args.dataset_path,log_path,model_save_path,args.base_model_path,n_epochs=args.epoch,batch_size=args.batch_size,resume_from=args.reuse)
 
 elif args.task=='test':
     train.eval.eval(args.dataset_path,args.model_path)

@@ -1,5 +1,6 @@
 import os
 import datetime
+import re
 from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset, DataLoader,random_split
@@ -13,7 +14,7 @@ TOKENS = {
   '<eos>': 0
 }
 
-def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=256,lr=1e-4,save_epoch=5):
+def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=256,lr=1e-4,save_epoch=5,resume_from=None):
     print('epoch:',n_epochs,'base_batch_size',batch_size)
     torch.random.manual_seed(231)
     use_cuda = True
@@ -67,6 +68,39 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
+    # 添加断点续训逻辑
+    start_epoch = 0
+    if resume_from is not None:
+        # 如果 resume_from 不是绝对路径，则在 model_save_path 目录中查找
+        if not os.path.isabs(resume_from):
+            resume_path = os.path.join(os.path.dirname(model_save_path), resume_from)
+        else:
+            resume_path = resume_from
+        
+        print(f"Looking for checkpoint at: {resume_path}")
+        print(f"Model directory: {os.path.dirname(model_save_path)}")
+        print(f"Resume from: {resume_from}")
+            
+        if os.path.exists(resume_path):
+            print(f"Loading checkpoint from {resume_path}")
+            checkpoint = torch.load(resume_path, map_location=device)
+            
+            # 加载模型状态
+            if num_gpus > 1:
+                model.module.load_state_dict(checkpoint['model_state_dict'])
+            else:
+                model.load_state_dict(checkpoint['model_state_dict'])
+            
+            # 加载优化器状态
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            
+            # 加载训练轮次
+            start_epoch = checkpoint['epoch']
+            
+            print(f"Resumed training from epoch {start_epoch}")
+        else:
+            print(f"Checkpoint file {resume_path} not found. Starting from scratch.")
+
     def params_loss_fn(params_label,params,params_mask):
         loss = torch.nn.functional.mse_loss(params, params_label, reduction='none')
     
@@ -99,7 +133,7 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
     val_accuracy = AverageMeter()
 
 # begin training
-    for epoch in range(n_epochs):
+    for epoch in range(start_epoch, n_epochs):
         model.train()
         print(f'Epoch {epoch} training...')
         for bat, input in enumerate(tqdm(train_loader)):
@@ -192,18 +226,43 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
 
         # print(f'Epoch {epoch}: Val\tLoss: {val_loss.avg:.6f} '
         #         f'\tAccuracy: {val_accuracy.avg:3.4%} '
+        
+        # 保存 checkpoint
         if (epoch + 1) % save_epoch == 0:
             writer.flush()
-            # save model every 10 epoch
-            if num_gpus > 1:
-                state_dict = model.module.state_dict()
-            else:
-                state_dict = model.state_dict()
-            torch.save(state_dict, model_save_path+f'_epoch_{epoch}'+'.pth')
+            # save model every save_epoch epochs
+            checkpoint = {
+                'epoch': epoch + 1,
+                'model_state_dict': model.module.state_dict() if num_gpus > 1 else model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_loss': train_loss.avg,
+                'val_loss': val_loss.avg,
+                'train_loss_order': train_loss_order.avg,
+                'train_loss_param': train_loss_param.avg,
+                'val_loss_order': val_loss_order.avg,
+                'val_loss_param': val_loss_param.avg,
+                'train_accuracy': train_accuracy.avg,
+                'val_accuracy': val_accuracy.avg,
+            }
+            torch.save(checkpoint, model_save_path+f'_epoch_{epoch}'+'.pth')
+            print(f"Checkpoint saved at epoch {epoch + 1}")
+            
         if ifsave:
-            state_dict = model.module.state_dict() if num_gpus > 1 else model.state_dict()
-            torch.save(state_dict, model_save_path+f'_epoch_{epoch}'+'.pth')
-            print(f"Model saved at epoch {epoch + 1}")
+            checkpoint = {
+                'epoch': epoch + 1,
+                'model_state_dict': model.module.state_dict() if num_gpus > 1 else model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_loss': train_loss.avg,
+                'val_loss': val_loss.avg,
+                'train_loss_order': train_loss_order.avg,
+                'train_loss_param': train_loss_param.avg,
+                'val_loss_order': val_loss_order.avg,
+                'val_loss_param': val_loss_param.avg,
+                'train_accuracy': train_accuracy.avg,
+                'val_accuracy': val_accuracy.avg,
+            }
+            torch.save(checkpoint, model_save_path+f'_epoch_{epoch}'+'.pth')
+            print(f"Checkpoint saved at epoch {epoch + 1}")
         #         )
         train_loss.reset()
         train_accuracy.reset()
@@ -214,6 +273,27 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
         val_loss_order.reset()
         val_loss_param.reset()
                   
+
+def find_latest_checkpoint(model_dir):
+    """查找最新的checkpoint文件"""
+    if not os.path.exists(model_dir):
+        return None
+    
+    checkpoint_files = []
+    for file in os.listdir(model_dir):
+        if 'epoch_' in file and file.endswith('.pth'):
+            # 提取epoch数字，适配当前文件名格式 model_save_path_epoch_X.pth
+            match = re.search(r'_epoch_(\d+)\.pth', file)
+            if match:
+                epoch_num = int(match.group(1))
+                checkpoint_files.append((epoch_num, os.path.join(model_dir, file)))
+    
+    if checkpoint_files:
+        # 返回最新的checkpoint文件路径
+        latest_checkpoint = max(checkpoint_files, key=lambda x: x[0])
+        return latest_checkpoint[1]
+    
+    return None
 
 if __name__=='__main__':
     train()

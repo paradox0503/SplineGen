@@ -24,11 +24,6 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_
         data_path=data_path)
     log_dir=log_dir
     model_dir = model_save_dir
-    # if 'h100' in torch.cuda.get_device_name(0).lower():
-    #     n_workers = max(8, os.cpu_count() // 2)  # H100可以使用更多worker
-    # else:
-    #     n_workers = max(8, os.cpu_count() // 2)  # 4090适当减少
-    # print("--------------------------------",torch.cuda.get_device_name(0).lower())
     n_workers = 4
                                          
     device='cuda'
@@ -231,7 +226,7 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_
                 'train_loss': train_loss,
                 'val_loss': val_loss,
             }
-            torch.save(checkpoint, f'{model_dir}/checkpoint_epoch_{epoch + 1}.pth')
+            torch.save(checkpoint, f'{model_dir}/epoch_{epoch + 1}.pth')
             print(f"Checkpoint saved at epoch {epoch + 1}")
             
         # Save model every 10 epochs (额外保存)
@@ -243,7 +238,7 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_
                 'train_loss': train_loss,
                 'val_loss': val_loss,
             }
-            torch.save(checkpoint, f'{model_dir}/checkpoint_epoch_{epoch + 1}.pth')
+            torch.save(checkpoint, f'{model_dir}/epoch_{epoch + 1}.pth')
             print(f"Checkpoint saved at epoch {epoch + 1}")
     
 
@@ -257,9 +252,9 @@ def find_latest_checkpoint(model_dir):
     
     checkpoint_files = []
     for file in os.listdir(model_dir):
-        if file.startswith('checkpoint_epoch_') and file.endswith('.pth'):
+        if file.startswith('epoch_') and file.endswith('.pth'):
             # 提取epoch数字
-            match = re.search(r'checkpoint_epoch_(\d+)\.pth', file)
+            match = re.search(r'epoch_(\d+)\.pth', file)
             if match:
                 epoch_num = int(match.group(1))
                 checkpoint_files.append((epoch_num, os.path.join(model_dir, file)))
