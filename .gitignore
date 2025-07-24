@@ -1,1 +1,6 @@
 src/splinegen/results
+# 忽略所有 __pycache__ 目录及其内容
+__pycache__/
+# 或忽略所有 .pyc 等编译文件
+*.py[cod]
+*$py.class
