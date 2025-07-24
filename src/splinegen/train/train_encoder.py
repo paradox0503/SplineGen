@@ -35,7 +35,7 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_
     num_decoder_layers = 3
     dim_feedforward = 2048
     dropout = 0.05
-    learning_rate = 0.0001 #This is very good: learning_rate = 0.0001
+    learning_rate = 0.00001 #This is very good: learning_rate = 0.0001
     # learning_rate = 0.00001 # have a test
     batch_size = base_batch_size * num_gpus
 
