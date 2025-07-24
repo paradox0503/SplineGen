@@ -14,7 +14,7 @@ import datetime
 from dataset.curveDataset_for_encoder import CurveDataset_for_encoder
 from torch.utils.data import random_split
 
-def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_from=None):
+def train(data_path,log_dir,model_save_dir,epochs=1000,batch_size=512,ifsave=False,resume_from=None):
     num_gpus = torch.cuda.device_count()
     print(f"Found {num_gpus} available GPUs. Using multi-GPU training.")
     if num_gpus == 0:
@@ -37,7 +37,7 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_
     dropout = 0.05
     learning_rate = 0.00001 #This is very good: learning_rate = 0.0001
     # learning_rate = 0.00001 # have a test
-    batch_size = base_batch_size * num_gpus
+    batch_size = batch_size * num_gpus
 
     # Create DataLoader for training data
     print('# Create DataLoader for training data')
@@ -132,9 +132,9 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_
     # Get a list of all existing model files
 
     # TensorBoard setup
-    torch.backends.cuda.matmul.allow_tf32 = True
+    # torch.backends.cuda.matmul.allow_tf32 = True
     writer = SummaryWriter(log_dir=log_dir)
-    scaler = torch.cuda.amp.GradScaler()
+    # scaler = torch.cuda.amp.GradScaler()
     def train_step(model,
                    batch,loss_avg:AverageMeter,
                    loss1_avg:AverageMeter,
@@ -164,9 +164,9 @@ def train(data_path,log_dir,model_save_dir,epochs,base_batch_size,ifsave,resume_
 
         if train:
             optimizer.zero_grad()
-            scaler.scale(loss).backward()  # 缩放梯度并反向传播
-            scaler.step(optimizer)         # 更新优化器
-            scaler.update()                # 更新缩放器
+            loss.backward()
+            optimizer.step()
+
 
     # Training loop
     for epoch in range(start_epoch,epochs):
