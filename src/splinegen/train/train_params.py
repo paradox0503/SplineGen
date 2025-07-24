@@ -14,19 +14,20 @@ TOKENS = {
   '<eos>': 0
 }
 
-def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=512,lr=1e-4,save_epoch=5,resume_from=None):
+def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=512,lr=1e-4,save_epoch=5,n_workers = 4,resume_from=None):
     print('epoch:',n_epochs,'base_batch_size',batch_size)
     torch.random.manual_seed(231)
+
     use_cuda = True
     num_gpus = torch.cuda.device_count() if use_cuda else 0
     print(f"Found {num_gpus} available GPUs. Using {'multi-GPU' if num_gpus > 1 else 'single-GPU'} training.")
     device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
     if num_gpus == 0 and use_cuda:
         print("Warning: No GPU available, falling back to CPU.")
-    # n_workers = max(8, os.cpu_count() // 2) 
-    n_workers = 4
+
     log_path=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     model_save_path = model_save_path+'/'
+
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
 
@@ -36,8 +37,7 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
     model_save_path=model_save_path
     batch_size = batch_size * num_gpus
     
-    dataset=CurveDataset(data_path,use_points_params=True,use_knots=True,use_orders=True,
-                          random_select_rate=None)
+    dataset=CurveDataset(data_path,use_points_params=True,use_knots=True,use_orders=True, random_select_rate=None)
     
     input_dim=dataset.dimension
 
@@ -52,12 +52,12 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
       num_workers=n_workers,shuffle=False,pin_memory=True)
 
-    # model=getModel.getModel_SimpleEncoder_Knots(device=device,knot_load_path=knot_model_load_path,input_dim=input_dim)
-    model = getModel.getModel_SimpleEncoder_Knots(
-        device='cuda:0' if num_gpus > 0 else 'cpu',  # 先加载到主GPU
-        knot_load_path=knot_model_load_path,
-        input_dim=input_dim
-    )
+    model=getModel.getModel_SimpleEncoder_Knots(device=device,knot_load_path=knot_model_load_path,input_dim=input_dim)
+    # model = getModel.getModel_SimpleEncoder_Knots(
+    #     device=device if num_gpus > 0 else 'cpu',  # 先加载到主GPU
+    #     knot_load_path=knot_model_load_path,
+    #     input_dim=input_dim
+    # )
     if num_gpus > 1:
         model = torch.nn.DataParallel(model)
         model = model.to(device)  # 移动到主GPU

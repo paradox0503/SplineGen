@@ -102,7 +102,7 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs=1000,base_b
         os.makedirs(model_dir)
 
     # TensorBoard setup
-    writer = SummaryWriter(log_dir=log_dir+datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+    writer = SummaryWriter(log_dir=log_dir)
 
     def train_step(model,batch,loss_avg:AverageMeter,criterion,train=True):
         batch_points = batch['points'].to(device)

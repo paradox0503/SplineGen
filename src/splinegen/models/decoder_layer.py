@@ -636,9 +636,7 @@ class TransformerDecoderForKPN(Module):
         self.num_layers = num_layers
         self.norm = norm
 
-    def forward(self, tgt: Tensor, memory: Tensor, tgt_mask: Optional[Tensor] = None,
-                memory_mask: Optional[Tensor] = None, tgt_key_padding_mask: Optional[Tensor] = None,
-                memory_key_padding_mask: Optional[Tensor] = None) -> Tensor:
+    def forward(self, tgt: Tensor, memory: Tensor, tgt_mask: Optional[Tensor] = None, memory_mask: Optional[Tensor] = None, tgt_key_padding_mask: Optional[Tensor] = None, memory_key_padding_mask: Optional[Tensor] = None) -> Tensor:
         r"""Pass the inputs (and mask) through the decoder layer in turn.
 
         Args:
