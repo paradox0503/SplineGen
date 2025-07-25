@@ -1,6 +1,10 @@
-src/splinegen/results
+# src/splinegen/results
 # 忽略所有 __pycache__ 目录及其内容
 __pycache__/
 # 或忽略所有 .pyc 等编译文件
 *.py[cod]
 *$py.class
+src/splinegen/results/train_diff_approximation/models
+src/splinegen/results/train_encoder/models
+src/splinegen/results/train_knot_decoder/models
+src/splinegen/results/train_param_decoder/models

@@ -18,6 +18,7 @@ TOKENS = {
 }
 
 def eval(data_path,model_load_path,use_cuda=True,n_workers=4,batch_size=256):
+    save_data=True
     degree=3
     device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
     torch.random.manual_seed(231)
@@ -28,6 +29,12 @@ def eval(data_path,model_load_path,use_cuda=True,n_workers=4,batch_size=256):
 
     val_loader = DataLoader(test_set, batch_size=batch_size,
       num_workers=n_workers,shuffle=False)
+    
+    # 用于存储数据的列表
+    all_knots = []
+    all_params = []
+    all_ctrl_pts = []
+    all_points = []
 
 
     model=getModel.getSplineGen(device=device,model_load_path=model_load_path)
@@ -92,6 +99,25 @@ def eval(data_path,model_load_path,use_cuda=True,n_workers=4,batch_size=256):
 
                 loss1,loss2,loss3,ctrl=nurbs_eval.getCtrlPts2(degree,[params,batch_points,batch_mask,knots,knot_length])
 
+                # 保存数据 (只保存batch中的第一个样本作为示例)
+                if save_data and bat == 0:  # 只保存第一个batch的第一个样本
+                    sample_idx = 0
+                    # 转换为CPU numpy数组
+                    knots_cpu = knots[sample_idx].cpu().numpy()
+                    params_cpu = params[sample_idx].cpu().numpy()
+                    ctrl_cpu = ctrl[sample_idx].cpu().numpy()
+                    points_cpu = batch_points[sample_idx].cpu().numpy()
+                    mask_cpu = batch_mask[sample_idx].cpu().numpy()
+                    knots_mask_cpu = knots_mask[sample_idx].cpu().numpy()
+                    
+                    # 只保存有效的数据点
+                    valid_points = points_cpu[mask_cpu.astype(bool)]
+                    valid_knots = knots_cpu[knots_mask_cpu.astype(bool)]
+                    
+                    all_knots.append(valid_knots)
+                    all_params.append(params_cpu)
+                    all_ctrl_pts.append(ctrl_cpu)
+                    all_points.append(valid_points)
 
                 val_loss.update(loss1.item()/ batch_lengths.size(0), batch_lengths.size(0))
                 val_loss2.update(loss2.item()/ batch_lengths.size(0), batch_lengths.size(0))
@@ -165,6 +191,19 @@ def eval(data_path,model_load_path,use_cuda=True,n_workers=4,batch_size=256):
           val_accuracy.reset()
           val_loss_order.reset()
           val_loss_param.reset()
+    
+    # 保存数据到文件
+    if save_data and len(all_knots) > 0:
+        np.savez('spline_data.npz', 
+                 knots=all_knots[0],
+                 params=all_params[0], 
+                 ctrl_pts=all_ctrl_pts[0],
+                 points=all_points[0])
+        print(f"数据已保存到 spline_data.npz")
+        print(f"knots shape: {all_knots[0].shape}")
+        print(f"params shape: {all_params[0].shape}")
+        print(f"ctrl_pts shape: {all_ctrl_pts[0].shape}")
+        print(f"points shape: {all_points[0].shape}")
                   
 
 if __name__=='__main__':

@@ -118,6 +118,7 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs=1000,base_b
         if train:
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
         return loss_avg

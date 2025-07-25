@@ -177,7 +177,14 @@ def getSplineGen(device='cuda',model_load_path='',base_model_load_path='',input_
      model=models.encoder_decoder.SplineGen(base_model,additional_model)
 
      if model_load_path:
-          model.load_state_dict(torch.load(model_load_path))
+          checkpoint = torch.load(model_load_path)
+          # 提取信息
+          model_params = checkpoint["model_state_dict"]  # 模型参数
+          # 加载到模型和优化器
+          model.load_state_dict(model_params)
+
+          
+          # model.load_state_dict(torch.load(model_load_path))
           print("Whole model loaded")
 
      return model

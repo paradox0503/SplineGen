@@ -14,7 +14,7 @@ TOKENS = {
   '<eos>': 0
 }
 
-def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=512,lr=1e-4,save_epoch=5,n_workers = 4,resume_from=None):
+def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_weights=[0.1,0.9],use_cuda=True,n_epochs=500,batch_size=512,lr=1e-5,save_epoch=5,n_workers = 4,resume_from=None):
     print('epoch:',n_epochs,'base_batch_size',batch_size)
     torch.random.manual_seed(231)
 
@@ -26,7 +26,7 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
         print("Warning: No GPU available, falling back to CPU.")
 
     log_path=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_save_path = model_save_path+'/'
+    model_save_path = model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
 
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
@@ -160,6 +160,7 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
                )
 
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             
             train_loss.update(loss.item(), batch_knots.size(0))

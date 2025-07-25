@@ -29,8 +29,9 @@ def train(ifsave,data_path,log_dir,model_save_path,base_model_load_path,use_cuda
         print("Warning: No GPU available, falling back to CPU.")
 
     batch_size = batch_size * num_gpus
-
-    model_save_path=model_save_path
+    log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    model_save_path = model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    # model_save_path=model_save_path
 
 
     if not os.path.exists(model_save_path):
@@ -149,6 +150,18 @@ def train(ifsave,data_path,log_dir,model_save_path,base_model_load_path,use_cuda
     cache_t=[]
     cache_v=[]
     for epoch in range(start_epoch, n_epochs):
+        # 在每个epoch开始时重置meters
+        train_loss.reset()
+        train_accuracy.reset()
+        train_loss_param.reset()
+        train_loss_order.reset()
+        train_loss_knots.reset()
+        val_loss.reset()
+        val_accuracy.reset()
+        val_loss_order.reset()
+        val_loss_param.reset()
+        val_loss_knots.reset()
+        
         model.train()
         cache=cache_t
         for bat, input in enumerate(tqdm(train_loader)):
@@ -267,14 +280,6 @@ def train(ifsave,data_path,log_dir,model_save_path,base_model_load_path,use_cuda
         print('Loss:',val_loss.avg,'epoch:', epoch+1)
         print('Accuracy:',val_accuracy.avg,'epoch:',epoch+1)
 
-        train_loss.reset()
-        train_accuracy.reset()
-        train_loss_param.reset()
-        train_loss_order.reset()
-        val_loss.reset()
-        val_accuracy.reset()
-        val_loss_order.reset()
-        val_loss_param.reset()
                   
 
 def find_latest_checkpoint(model_dir):
