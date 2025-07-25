@@ -23,7 +23,7 @@ def train(data_path,log_dir,model_save_dir,epochs=1000,batch_size=512,ifsave=Fal
     dataset = CurveDataset_for_encoder(
         data_path=data_path)
     log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_dir = model_save_dir+'/'
+    model_dir = model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
     n_workers = 4
                                          
     device='cuda'
@@ -120,7 +120,11 @@ def train(data_path,log_dir,model_save_dir,epochs=1000,batch_size=512,ifsave=Fal
         loss = loss.masked_fill(knots_mask == 0, 0)
         loss = loss.sum(dim=-1)
         knots_len = knots_mask.sum(dim = -1)
-
+        
+        # 防止除零错误，添加小的epsilon值
+        eps = 1e-8
+        knots_len = torch.clamp(knots_len, min=eps)
+        
         loss = loss/knots_len
         return torch.mean(loss)
     criterion = loss_fn  # Mean Squared Error Loss
@@ -165,11 +169,30 @@ def train(data_path,log_dir,model_save_dir,epochs=1000,batch_size=512,ifsave=Fal
         if train:
             optimizer.zero_grad()
             loss.backward()
+            
+            # 梯度裁剪防止梯度爆炸
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
             optimizer.step()
+        
 
+
+    # 定义模型权重检查函数
+    def check_model_weights(model):
+        """检查模型权重是否包含NaN或Inf"""
+        for name, param in model.named_parameters():
+            if torch.isnan(param).any() or torch.isinf(param).any():
+                print(f"Warning: Found NaN/Inf in parameter {name}")
+                return False
+        return True
 
     # Training loop
     for epoch in range(start_epoch,epochs):
+        
+        # 在每个epoch开始前检查模型权重
+        if not check_model_weights(model):
+            print(f"Model weights contain NaN/Inf at epoch {epoch}. Stopping training.")
+            break
 
         train_loss1_recoder=AverageMeter()
         val_loss1_recoder=AverageMeter()
