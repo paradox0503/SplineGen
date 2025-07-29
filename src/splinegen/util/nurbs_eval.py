@@ -1,6 +1,6 @@
 import torch
 import time
-
+import numpy as np
 '''
 Modified from NURBS-Diff
 (https://github.com/idealab-isu/NURBSDiff)
@@ -538,10 +538,28 @@ def getCtrlPts2(p,input,reduce=True):
     points=torch.masked_fill(points,~(points_mask.unsqueeze(-1).expand(-1,-1,points.shape[-1])).bool(),0)
     preprocess_time = time.time() - preprocess_start
 
+    all_knots = []
+    all_params = []
+    all_ctrl_pts = []
+    all_points = []
+    
     U=knot_u
     # U_c = torch.cumsum(torch.where(knot_u<0.0, knot_u*0+1e-4, knot_u), dim=1)
     # U = (U_c - U_c[:,0].unsqueeze(-1)) / (U_c[:,-1].unsqueeze(-1) - U_c[:,0].unsqueeze(-1))
 
+    # 只保存第一个batch的第一个样本
+    sample_idx = 0
+    # 转换为CPU numpy数组
+    knots_cpu = U[sample_idx].cpu().numpy()
+    params_cpu = params[sample_idx].cpu().numpy()
+    
+    points_cpu = points[sample_idx].cpu().numpy()
+
+    
+    all_knots.append(knots_cpu)
+    all_params.append(params_cpu)
+    
+    all_points.append(points_cpu)
     if torch.isnan(U).any():
         # print(U_c)
         print(knot_u)
@@ -632,16 +650,25 @@ def getCtrlPts2(p,input,reduce=True):
     total_time = time.time() - start_time
     
     # 输出时间统计
-    print(f"NURBS2计算时间统计:")
-    print(f"  预处理时间: {preprocess_time*1000:.2f}ms")
-    print(f"  参数计算时间: {param_calc_time*1000:.2f}ms") 
-    print(f"  基函数计算时间: {basis_time*1000:.2f}ms")
-    print(f"  矩阵组装时间: {matrix_time*1000:.2f}ms")
-    print(f"  线性求解时间: {solve_time*1000:.2f}ms")
-    print(f"  损失计算时间: {loss_calc_time*1000:.2f}ms")
-    print(f"  总计算时间: {total_time*1000:.2f}ms")
-    print("-" * 40)
-
+    # print(f"NURBS2计算时间统计:")
+    # print(f"  预处理时间: {preprocess_time*1000:.2f}ms")
+    # print(f"  参数计算时间: {param_calc_time*1000:.2f}ms") 
+    # print(f"  基函数计算时间: {basis_time*1000:.2f}ms")
+    # print(f"  矩阵组装时间: {matrix_time*1000:.2f}ms")
+    # print(f"  线性求解时间: {solve_time*1000:.2f}ms")
+    # print(f"  损失计算时间: {loss_calc_time*1000:.2f}ms")
+    # print(f"  总计算时间: {total_time*1000:.2f}ms")
+    # print("-" * 40)
+    ctrl_cpu = solution[sample_idx].cpu().numpy()
+    all_ctrl_pts.append(ctrl_cpu)
+    sample_idx2=0
+    np.savez('spline_data.npz', 
+                 knots=all_knots[sample_idx2],
+                 params=all_params[sample_idx2], 
+                 ctrl_pts=all_ctrl_pts[sample_idx2],
+                 points=all_points[sample_idx2])
+    print(f"数据已保存到 spline_data.npz")
+    # import pdb;pdb.set_trace()
     return loss1,loss2,h_loss,solution
     # return torch.functional.F.mse_loss((N_all@solution),points)
 

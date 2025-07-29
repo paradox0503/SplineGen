@@ -18,7 +18,7 @@ TOKENS = {
 }
 
 def eval(data_path,model_load_path,use_cuda=True,n_workers=4,batch_size=256):
-    save_data=True
+    save_data=False
     degree=3
     device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
     torch.random.manual_seed(231)

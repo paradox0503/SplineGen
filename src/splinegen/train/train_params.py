@@ -48,7 +48,7 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
 
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-      num_workers=n_workers,pin_memory=True)
+      num_workers=n_workers,shuffle=True,pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
       num_workers=n_workers,shuffle=False,pin_memory=True)
 
