@@ -22,8 +22,10 @@ def train(data_path,log_dir,model_save_dir,epochs=1000,batch_size=512,ifsave=Fal
     
     dataset = CurveDataset_for_encoder(
         data_path=data_path)
-    log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_dir = model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    # log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    # model_dir = model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    log_dir=log_dir
+    model_dir = model_save_dir
     n_workers = 4
                                          
     device='cuda'

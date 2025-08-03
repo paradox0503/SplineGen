@@ -28,9 +28,9 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs=1000,base_b
         random_select_rate=None
         )
     # log_dir=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    # model_dir = knot_model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_dir=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_dir = knot_model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    # model_dir = knot_model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    log_dir=log_path
+    model_dir = knot_model_save_dir
     device='cuda'
     p = 3
     input_dim=dataset.dimension

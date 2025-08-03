@@ -7,6 +7,7 @@ import train.train_knots
 import train.train_params
 import train.train_differientiable_approximation_layer
 import train.eval
+import datetime
 
 parser = argparse.ArgumentParser("SplineGen")
 parser.add_argument(
@@ -88,6 +89,11 @@ else:
     # results_path = Path("/work") / "results" / args.experiment_name
 log_path= str(results_path.joinpath('logs'))
 model_save_path= str(results_path.joinpath('models'))
+
+# log_path=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+# model_save_path = model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+log_path=log_path+'/'+"1"
+model_save_path = model_save_path+'/'+"1"+'/'
 
 if not results_path.exists():
     results_path.mkdir(parents=True, exist_ok=True)

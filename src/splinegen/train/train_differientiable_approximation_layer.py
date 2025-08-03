@@ -29,8 +29,10 @@ def train(ifsave,data_path,log_dir,model_save_path,base_model_load_path,use_cuda
         print("Warning: No GPU available, falling back to CPU.")
 
     batch_size = batch_size * num_gpus
-    log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_save_path = model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    # log_dir=log_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    # model_save_path = model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    log_dir=log_dir
+    model_save_path = model_save_path
     # model_save_path=model_save_path
 
 

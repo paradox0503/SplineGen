@@ -25,8 +25,10 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
     if num_gpus == 0 and use_cuda:
         print("Warning: No GPU available, falling back to CPU.")
 
-    log_path=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_save_path = model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    # log_path=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    # model_save_path = model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+    log_path=log_path
+    model_save_path = model_save_path
 
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
