@@ -8,3 +8,5 @@ src/splinegen/results/train_diff_approximation/models
 src/splinegen/results/train_encoder/models
 src/splinegen/results/train_knot_decoder/models
 src/splinegen/results/train_param_decoder/models
+src/splinegen/results-20
+spline-tool/*.npz
