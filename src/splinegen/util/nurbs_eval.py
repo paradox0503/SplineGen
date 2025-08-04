@@ -524,48 +524,47 @@ def getCtrlPts_fast(p, input, reduce=True):
     return loss1, loss2, solution
 
 
-def getCtrlPts2(p,input,reduce=True):
+def getCtrlPts2(p, input, reduce=True):
+    verbose=False
+    save_data=True
+    save_path=None
+    """
+    NURBS控制点求解函数
+    
+    Args:
+        p: NURBS阶数
+        input: 输入数据 (params, points, points_mask, knot_u, knots_len)
+        reduce: 是否对损失进行归约
+        verbose: 是否输出时间统计信息
+        save_data: 是否保存数据到文件
+        save_path: 保存路径，如果为None则自动生成带时间戳的文件名
+    
+    Returns:
+        loss1, loss2, h_loss, solution
+    """
     # input will be of dimension (batch_size, m+1, n+1, dimension)
     # 1 batch
-    start_time = time.time()
+    start_time = time.time() if verbose else None
     
-    params,points,points_mask,knot_u,knots_len= input
-    device=params.device
+    params, points, points_mask, knot_u, knots_len = input
+    device = params.device
 
     # 数据预处理时间
-    preprocess_start = time.time()
-    params=torch.masked_fill(params,~points_mask.bool(),0)
-    points=torch.masked_fill(points,~(points_mask.unsqueeze(-1).expand(-1,-1,points.shape[-1])).bool(),0)
-    preprocess_time = time.time() - preprocess_start
-
-    all_knots = []
-    all_params = []
-    all_ctrl_pts = []
-    all_points = []
+    preprocess_start = time.time() if verbose else None
+    params = torch.masked_fill(params, ~points_mask.bool(), 0)
+    points = torch.masked_fill(points, ~(points_mask.unsqueeze(-1).expand(-1, -1, points.shape[-1])).bool(), 0)
+    preprocess_time = (time.time() - preprocess_start) if verbose else None
     
-    U=knot_u
+    U = knot_u
     # U_c = torch.cumsum(torch.where(knot_u<0.0, knot_u*0+1e-4, knot_u), dim=1)
     # U = (U_c - U_c[:,0].unsqueeze(-1)) / (U_c[:,-1].unsqueeze(-1) - U_c[:,0].unsqueeze(-1))
 
-    # 只保存第一个batch的第一个样本
-    sample_idx = 0
-    # 转换为CPU numpy数组
-    knots_cpu = U[sample_idx].cpu().numpy()
-    params_cpu = params[sample_idx].cpu().numpy()
-    
-    points_cpu = points[sample_idx].cpu().numpy()
-
-    
-    all_knots.append(knots_cpu)
-    all_params.append(params_cpu)
-    
-    all_points.append(points_cpu)
     if torch.isnan(U).any():
         # print(U_c)
         print(knot_u)
 
     # 参数计算时间
-    param_calc_start = time.time()
+    param_calc_start = time.time() if verbose else None
     u = params.unsqueeze(1)
     uspan_uv = torch.stack([torch.min(torch.where((u[s] - U[s,p:].unsqueeze(1))>1e-8, u[s] - U[s,p:].unsqueeze(1), (u[s] - U[s,p:].unsqueeze(1))*0.0 + 1),0,keepdim=False)[1]+p for s in range(U.size(0))])
 
@@ -574,10 +573,10 @@ def getCtrlPts2(p,input,reduce=True):
     # print((u[0] - U[0,p:].unsqueeze(1))[...,35])
 
     u = u.squeeze(1)
-    param_calc_time = time.time() - param_calc_start
+    param_calc_time = (time.time() - param_calc_start) if verbose else None
     
     # 基函数计算时间
-    basis_start = time.time()
+    basis_start = time.time() if verbose else None
     Ni = [u*0 for i in range(p+1)]
     Ni[0] = u*0 + 1
     for k in range(1,p+1):
@@ -596,10 +595,10 @@ def getCtrlPts2(p,input,reduce=True):
         Ni[k] = saved
 
     Nu_uv = torch.stack(Ni).permute(1,2,0)
-    basis_time = time.time() - basis_start
+    basis_time = (time.time() - basis_start) if verbose else None
     
     # 矩阵组装时间
-    matrix_start = time.time()
+    matrix_start = time.time() if verbose else None
     # torch.linalg.lstsq()
     scatter_index=torch.arange(-p,1,device=device).unsqueeze(0).unsqueeze(0).expand(uspan_uv.shape[0],uspan_uv.shape[1],-1)
     scatter_index=uspan_uv.unsqueeze(-1)+scatter_index
@@ -610,16 +609,61 @@ def getCtrlPts2(p,input,reduce=True):
     N_mask=points_mask.unsqueeze(-1).expand(-1,-1,30)
 
     N_all=torch.masked_fill(N_all,~N_mask.bool(),0)
-    matrix_time = time.time() - matrix_start
+    matrix_time = (time.time() - matrix_start) if verbose else None
 
     # 求解时间
-    solve_start = time.time()
+    solve_start = time.time() if verbose else None
     solution=torch.linalg.pinv(N_all)@points
+
     pred_points=N_all@solution
-    solve_time = time.time() - solve_start
-    
+    solve_time = (time.time() - solve_start) if verbose else None
+    # 准备数据保存（修正部分）
+    if save_data:
+        # 只保存第一个batch的第一个样本
+        sample_idx = 0
+        
+        # 1. 节点向量：按knots_len截取有效部分（核心修正）
+        knots_raw = knot_u[sample_idx].cpu().numpy()
+        valid_knots_len = knots_len[sample_idx].item()  # 获取该样本的有效节点长度
+        knots_cpu = knots_raw[:valid_knots_len]  # 只保留有效节点
+        
+        # 2. 参数和原始点（保持）
+        params_cpu = params[sample_idx].cpu().numpy()
+        points_cpu = points[sample_idx].cpu().numpy()
+        mask_cpu = points_mask[sample_idx].cpu().numpy()  # 保存掩码用于后续处理
+        
+        # 3. 控制点：过滤无效零值（核心修正）
+        # solution是控制点求解结果，形状可能为(..., 30)，需过滤全零行
+        ctrl_raw = solution[sample_idx].cpu().numpy()
+        # 过滤全零控制点（但保留至少2个有效点，避免空数组）
+        non_zero_mask = ~np.all(ctrl_raw == 0, axis=1)
+        ctrl_cpu = ctrl_raw[non_zero_mask] if np.sum(non_zero_mask) > 0 else ctrl_raw[:2]  # 至少保留2个点
+        
+        # 存储到列表
+        all_knots = [knots_cpu]
+        all_params = [params_cpu]
+        all_points = [points_cpu]
+        all_ctrl_pts = [ctrl_cpu]
+        all_masks = [mask_cpu]  # 保存掩码
+    if save_data:
+        if save_path is None:
+            save_path = f'spline_data_{int(time.time())}.npz'
+        
+        # 保存关键数据：包含有效节点、控制点、原始点及掩码
+        np.savez(
+            save_path,
+            knots=all_knots[0],          # 已截取的有效节点
+            params=all_params[0],
+            ctrl_pts=all_ctrl_pts[0],    # 已过滤的有效控制点
+            points=all_points[0],
+            points_mask=all_masks[0]     # 新增：原始点的掩码
+        )
+        print(f"数据已保存到 {save_path}，包含：")
+        print(f"  有效节点数: {len(all_knots[0])}")
+        print(f"  有效控制点数: {len(all_ctrl_pts[0])}")
+        print(f"  有效原始点数: {np.sum(all_masks[0])}") 
     # 损失计算时间
-    loss_calc_start = time.time()
+    loss_calc_start = time.time() if verbose else None
     residuals=points-pred_points
 
     residuals=torch.masked_fill(residuals,~(points_mask.unsqueeze(-1).expand(-1,-1,points.shape[-1])).bool(),0)
@@ -642,34 +686,41 @@ def getCtrlPts2(p,input,reduce=True):
         loss1=loss.max(dim=-1)[0]
         # loss2=loss.mean(dim=-1)
         loss2=(loss.sum(dim=-1)/points_mask.sum(dim=-1))
-    loss_calc_time = time.time() - loss_calc_start
-
+    loss_calc_time = (time.time() - loss_calc_start) if verbose else None
 
     #### pinv method end #####
     
-    total_time = time.time() - start_time
+    total_time = (time.time() - start_time) if verbose else None
     
     # 输出时间统计
-    # print(f"NURBS2计算时间统计:")
-    # print(f"  预处理时间: {preprocess_time*1000:.2f}ms")
-    # print(f"  参数计算时间: {param_calc_time*1000:.2f}ms") 
-    # print(f"  基函数计算时间: {basis_time*1000:.2f}ms")
-    # print(f"  矩阵组装时间: {matrix_time*1000:.2f}ms")
-    # print(f"  线性求解时间: {solve_time*1000:.2f}ms")
-    # print(f"  损失计算时间: {loss_calc_time*1000:.2f}ms")
-    # print(f"  总计算时间: {total_time*1000:.2f}ms")
-    # print("-" * 40)
-    ctrl_cpu = solution[sample_idx].cpu().numpy()
-    all_ctrl_pts.append(ctrl_cpu)
-    sample_idx2=0
-    np.savez('spline_data.npz', 
-                 knots=all_knots[sample_idx2],
-                 params=all_params[sample_idx2], 
-                 ctrl_pts=all_ctrl_pts[sample_idx2],
-                 points=all_points[sample_idx2])
-    print(f"数据已保存到 spline_data.npz")
+    if verbose:
+        print(f"NURBS2计算时间统计:")
+        print(f"  预处理时间: {preprocess_time*1000:.2f}ms")
+        print(f"  参数计算时间: {param_calc_time*1000:.2f}ms") 
+        print(f"  基函数计算时间: {basis_time*1000:.2f}ms")
+        print(f"  矩阵组装时间: {matrix_time*1000:.2f}ms")
+        print(f"  线性求解时间: {solve_time*1000:.2f}ms")
+        print(f"  损失计算时间: {loss_calc_time*1000:.2f}ms")
+        print(f"  总计算时间: {total_time*1000:.2f}ms")
+        print("-" * 40)
+    
+    # 保存数据到文件
+    if save_data:
+        ctrl_cpu = solution[0].cpu().numpy()
+        all_ctrl_pts.append(ctrl_cpu)
+        
+        if save_path is None:
+            save_path = f'spline_data_{int(time.time())}.npz'
+        
+        np.savez(save_path, 
+                 knots=all_knots[0],
+                 params=all_params[0], 
+                 ctrl_pts=all_ctrl_pts[0],
+                 points=all_points[0])
+        print(f"数据已保存到 {save_path}")
+    
     # import pdb;pdb.set_trace()
-    return loss1,loss2,h_loss,solution
+    return loss1, loss2, h_loss, solution
     # return torch.functional.F.mse_loss((N_all@solution),points)
 
 def Hausdorff_distance_batch(a : torch.Tensor, b : torch.Tensor):
