@@ -191,7 +191,7 @@ class SplineGen(nn.Module):
     def __init__(self, base_model,additional_model) -> None:
         super().__init__()
         self.base_model=base_model
-        self.additional_model=additional_model
+        # self.additional_model=additional_model
 
     def forward(self,points,params,points_mask,points_len,label,knots,knots_mask,eval=False,half_eval=True):
         with torch.no_grad():
@@ -203,6 +203,6 @@ class SplineGen(nn.Module):
             indices=pointer_argmaxs.unsqueeze(-1).expand(-1, -1, 2).clip(0,points.size(1)-1).long()
             points=torch.gather(points,1,torch.where(indices==0,0,(indices-1)))
 
-        params,knots=self.additional_model(points,params,points_mask,knots,knots_mask)
+        # params,knots=self.additional_model(points,params,points_mask,knots,knots_mask)
 
         return knots,knots_mask,log_pointer_scores, pointer_argmaxs,params

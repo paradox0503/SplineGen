@@ -10,3 +10,4 @@ src/splinegen/results/train_knot_decoder/models
 src/splinegen/results/train_param_decoder/models
 src/splinegen/results-20
 spline-tool/*.npz
+src/splinegen/results/knots_optimization

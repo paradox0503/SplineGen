@@ -96,7 +96,7 @@ def convert_points(npz_file_path, output_file=None, keep_zero_rows=False):
 # 使用示例
 if __name__ == "__main__":
     # 检查文件是否存在
-    npz_file = "spline_data.npz"
+    npz_file = "spline_data_1754277229.npz"
     if not os.path.exists(npz_file):
         print(f"错误: 文件 {npz_file} 不存在")
         exit(1)
@@ -215,7 +215,7 @@ if __name__ == "__main__":
         # 先保存再显示
         plt.savefig('bspline_curve.png', dpi=300, bbox_inches='tight')
         print("图片已保存为 bspline_curve.png")
-        plt.show()
+        # plt.show()
         
     except Exception as e:
         print(f"程序执行出错: {e}")

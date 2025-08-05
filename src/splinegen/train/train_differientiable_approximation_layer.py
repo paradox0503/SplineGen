@@ -282,26 +282,5 @@ def train(ifsave,data_path,log_dir,model_save_path,base_model_load_path,use_cuda
 
                   
 
-def find_latest_checkpoint(model_dir):
-    """查找最新的checkpoint文件"""
-    if not os.path.exists(model_dir):
-        return None
-    
-    checkpoint_files = []
-    for file in os.listdir(model_dir):
-        if file.startswith('epoch_') and file.endswith('.pth'):
-            # 提取epoch数字
-            match = re.search(r'epoch_(\d+)\.pth', file)
-            if match:
-                epoch_num = int(match.group(1))
-                checkpoint_files.append((epoch_num, os.path.join(model_dir, file)))
-    
-    if checkpoint_files:
-        # 返回最新的checkpoint文件路径
-        latest_checkpoint = max(checkpoint_files, key=lambda x: x[0])
-        return latest_checkpoint[1]
-    
-    return None
-
 if __name__=='__main__':
     train()

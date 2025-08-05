@@ -112,6 +112,7 @@ if __name__ == "__main__":
     # 读取数据获取控制点数量
     data = np.load("spline_data.npz")
     ctrl_pts = data['ctrl_pts']
+    import pdb; pdb.set_trace()
     non_zero_mask = ~np.all(ctrl_pts == 0, axis=1)
     len_ctrl_pts = np.sum(non_zero_mask)
     max_length = len_ctrl_pts + 4
