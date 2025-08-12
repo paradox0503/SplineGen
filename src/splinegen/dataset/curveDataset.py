@@ -21,25 +21,27 @@ class CurveDataset(Dataset):
     print('data loading...')
     data=np.load(data_path)
 
-    degree=data['degree']
-    self.degree=degree
-
-    print('degree:',degree)
     self.keys=[]
 
     if use_points_params:
         points=data['points'] 
-        num_curve,max_point_len,dimension=points.shape
+        _,max_point_len,dimension=points.shape
         print('points shape:',points.shape)
         
-        points_len_array=data['points_len'] # (num_curve)
+        points_len_array=data['actual_lengths'][:, 0]  # (num_curve)
         
         self.points=points
-        self.params=data['params']
+        self.params=data['arc_radians']
         self.points_mask=self.getPaddingMask(max_point_len,points_len_array)
         self.points_len=points_len_array
+
+
+        max_params_len=data['max_lengths'][2]
+        params_len_array = points_len_array  
+        self.params_mask = self.getPaddingMask(max_params_len, params_len_array)
+        self.params_expanded,self.params_mask_expanded=self.add_tokens(self.params,self.params_mask)
         
-        self.keys.extend(['points','params','points_mask','points_len'])
+        self.keys.extend(['points','params','points_mask','points_len','params_mask'])
 
         self.use_orders=use_orders
         self.dimension=dimension
@@ -50,23 +52,13 @@ class CurveDataset(Dataset):
           
           self.targets=[np.arange(l) for l in self.points_len_array]
 
-    if use_ctrl_pts or use_knots: 
-        ctrl_pts=data['ctrl_pts']
-        _,max_ctrl_len,__=ctrl_pts.shape
-        print('ctrl_pts shape:',ctrl_pts.shape)
-        ctrl_pts_len_array=data['ctrl_pts_len'] # (num_curve)
-        
-        if use_ctrl_pts:
-            self.ctrl_pts=data['ctrl_pts']
-            self.ctrl_mask=self.getPaddingMask(max_ctrl_len,ctrl_pts_len_array)
-            
-            self.keys.extend(['ctrl_pts','ctrl_mask'])
-
-        if use_knots:
-            self.knots=data['knots']
-            self.knots_mask=self.getPaddingMask(max_ctrl_len+degree+1,ctrl_pts_len_array+(degree+1))
-            self.knots_expanded,self.knots_mask_expanded=self.add_tokens(self.knots,self.knots_mask)
-            self.keys.extend(['knots','knots_mask','knots_expanded','knots_mask_expanded'])
+    if use_knots:
+        self.knots=data['knots']
+        max_knots_len=data['max_lengths'][1]
+        knots_len_array=data['actual_lengths'][:, 1]
+        self.knots_mask=self.getPaddingMask(max_knots_len,knots_len_array)
+        self.knots_expanded,self.knots_mask_expanded=self.add_tokens(self.knots,self.knots_mask)
+        self.keys.extend(['knots','knots_mask','knots_expanded','knots_mask_expanded'])
 
     self.random_select_rate=random_select_rate
     

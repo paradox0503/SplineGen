@@ -18,15 +18,15 @@ class CurveDataset_for_encoder(Dataset):
     points=data['points'] 
     _,max_point_len,dimension=points.shape
     self.dimension=dimension
+    #points
     points_len_array=data['actual_lengths'][:, 0] # (num_curve)
-    
-    
     self.points=points
-    self.params=data['arc_radians']
     self.points_mask=self.getPaddingMask(max_point_len,points_len_array)
+
+    #params
+    self.params=data['arc_radians']
     max_params_len=data['max_lengths'][2]
-    # Get params mask (assuming params has the same length as points)
-    params_len_array = points_len_array  # or use appropriate length array for params
+    params_len_array=data['actual_lengths'][:, 2] 
     self.params_mask = self.getPaddingMask(max_params_len, params_len_array)
     self.params_expanded,self.params_mask_expanded=self.add_tokens(self.params,self.params_mask)
 
@@ -34,13 +34,8 @@ class CurveDataset_for_encoder(Dataset):
     self.keys.extend(['params_expanded','params_mask_expanded'])
     self.keys.extend(['points','params','points_mask','params_mask'])
 
-    # ctrl_pts=data['ctrl_pts']
-    # _,max_ctrl_len,__=ctrl_pts.shape
-    # print('ctrl_pts shape:',ctrl_pts.shape)
-    # ctrl_pts_len_array=data['ctrl_pts_len'] # (num_curve)
-    
+    #knots
     self.knots=data['knots']
-    
     max_knots_len=data['max_lengths'][1]
     knots_len_array=data['actual_lengths'][:, 1]
     self.knots_mask=self.getPaddingMask(max_knots_len,knots_len_array)
