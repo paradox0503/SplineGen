@@ -15,34 +15,35 @@ class CurveDataset_for_encoder(Dataset):
     print('data loading...')
     data=np.load(data_path)
 
-    degree=data['degree']
-    self.degree=degree
-
-    print('degree:',degree)
-    self.keys=[]
-
     points=data['points'] 
-    num_curve,max_point_len,dimension=points.shape
+    _,max_point_len,dimension=points.shape
     self.dimension=dimension
-    print('points shape:',points.shape)
+    points_len_array=data['actual_lengths'][:, 0] # (num_curve)
     
-    points_len_array=data['points_len'] # (num_curve)
     
     self.points=points
-    self.params=data['params']
+    self.params=data['arc_radians']
     self.points_mask=self.getPaddingMask(max_point_len,points_len_array)
-    self.params_expanded,self.params_mask_expanded=self.add_tokens(self.params,self.points_mask)
+    max_params_len=data['max_lengths'][2]
+    # Get params mask (assuming params has the same length as points)
+    params_len_array = points_len_array  # or use appropriate length array for params
+    self.params_mask = self.getPaddingMask(max_params_len, params_len_array)
+    self.params_expanded,self.params_mask_expanded=self.add_tokens(self.params,self.params_mask)
 
+    self.keys = []  # Initialize keys list
     self.keys.extend(['params_expanded','params_mask_expanded'])
-    self.keys.extend(['points','params','points_mask'])
+    self.keys.extend(['points','params','points_mask','params_mask'])
 
-    ctrl_pts=data['ctrl_pts']
-    _,max_ctrl_len,__=ctrl_pts.shape
-    print('ctrl_pts shape:',ctrl_pts.shape)
-    ctrl_pts_len_array=data['ctrl_pts_len'] # (num_curve)
+    # ctrl_pts=data['ctrl_pts']
+    # _,max_ctrl_len,__=ctrl_pts.shape
+    # print('ctrl_pts shape:',ctrl_pts.shape)
+    # ctrl_pts_len_array=data['ctrl_pts_len'] # (num_curve)
     
     self.knots=data['knots']
-    self.knots_mask=self.getPaddingMask(max_ctrl_len+degree+1,ctrl_pts_len_array+(degree+1))
+    
+    max_knots_len=data['max_lengths'][1]
+    knots_len_array=data['actual_lengths'][:, 1]
+    self.knots_mask=self.getPaddingMask(max_knots_len,knots_len_array)
     self.knots_expanded,self.knots_mask_expanded=self.add_tokens(self.knots,self.knots_mask)
     self.keys.extend(['knots','knots_mask','knots_expanded','knots_mask_expanded'])
     
@@ -57,6 +58,7 @@ class CurveDataset_for_encoder(Dataset):
   def add_tokens(self, knots,mask):
     knots=torch.tensor(knots)
     mask=torch.tensor(mask)
+    
     # 1. Add the SOS and EOS tokens to the points_params
     # points_params = torch.cat((torch.full_like(points_params[:, :1], SOS), points_params, torch.full_like(points_params[:, :1], EOS)), dim=1)
 
@@ -69,7 +71,6 @@ class CurveDataset_for_encoder(Dataset):
     batch_size, length = knots.size()
     new_knots = torch.zeros((batch_size, length + len(KNOT_TOKENS), 1+len(KNOT_TOKENS)))
 
-    
     new_knots[:,1:length+1,0] = knots
     new_knots[:,0,1] = 1.0 # start token
 
@@ -78,6 +79,7 @@ class CurveDataset_for_encoder(Dataset):
     batch_knots_mask_new[:,0] = True
     batch_knots_mask_new[:, 1:batch_knots_mask.size(1) + 1] = batch_knots_mask
 
+    # Set EOS token for all valid positions
     new_knots[...,2].masked_fill_(~batch_knots_mask_new,1.0)
 
     return new_knots,batch_knots_mask_new
@@ -101,7 +103,4 @@ class CurveDataset_for_encoder(Dataset):
     for key in self.keys:
       setattr(self,key,getattr(self,key).to(device))
     return self
-
-  def __len__(self) -> int:
-    return len(self.points)
     

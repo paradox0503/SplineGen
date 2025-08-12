@@ -21,14 +21,11 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs=1000,base_b
     print(f"Found {num_gpus} available GPUs. Using multi-GPU training.")
     if num_gpus == 0:
         raise ValueError("No GPU available. Please check CUDA configuration.")
-    # n_workers = max(8, os.cpu_count() // 2) 
     n_workers = 4
     dataset = CurveDataset(
         data_path,
         random_select_rate=None
         )
-    # log_dir=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    # model_dir = knot_model_save_dir+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
     log_dir=log_path
     model_dir = knot_model_save_dir
     device='cuda'
