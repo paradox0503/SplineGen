@@ -31,13 +31,12 @@ class CurveDataset(Dataset):
         points_len_array=data['actual_lengths'][:, 0]  # (num_curve)
         
         self.points=points
-        self.params=data['arc_radians']
         self.points_mask=self.getPaddingMask(max_point_len,points_len_array)
         self.points_len=points_len_array
 
-
+        self.params=data['arc_radians']
         max_params_len=data['max_lengths'][2]
-        params_len_array = points_len_array  
+        params_len_array = data['actual_lengths'][:, 2]  
         self.params_mask = self.getPaddingMask(max_params_len, params_len_array)
         self.params_expanded,self.params_mask_expanded=self.add_tokens(self.params,self.params_mask)
         
