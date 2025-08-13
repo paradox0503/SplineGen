@@ -31,7 +31,7 @@ def train(data_path,log_dir,model_save_dir,epochs=1000,batch_size=512,ifsave=Fal
     device='cuda'
     KNOT_LOSS_WEIGHT=0.3
     p = 3
-    d_model = 512  # Embedding dimension
+    d_model = 256  # Embedding dimension
     nhead = 4
     num_encoder_layers = 3
     num_decoder_layers = 3

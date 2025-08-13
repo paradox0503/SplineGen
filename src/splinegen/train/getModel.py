@@ -19,7 +19,7 @@ TOKENS = {
 }
 
 def getModel_Simple(device='cuda',encoder_load_path=None,model_load_path=None,input_dim=3):
-     d_model = 512  # Embedding dimension
+     d_model = 256  # Embedding dimension
      nhead = 4
 
      num_decoder_layers = 3
@@ -79,7 +79,7 @@ def getModel_Simple(device='cuda',encoder_load_path=None,model_load_path=None,in
      return model
 
 def getModel_SimpleEncoder_Knots(device='cuda',input_dim=3,internal_attention=True,model_load_path='',knot_load_path=''):
-     c_embed = 512 # 64# 16
+     c_embed = 256 # 64# 16
      c_hidden2 = 1024 # 16
      n_heads = 4
      n_layers = 3
@@ -90,7 +90,7 @@ def getModel_SimpleEncoder_Knots(device='cuda',input_dim=3,internal_attention=Tr
      # min_samples=20``
 
      en_input_dim=input_dim
-     d_model=512 
+     d_model=256 
      en_num_encoder_layers=3
      en_nhead=4
      dim_feedforward=2048

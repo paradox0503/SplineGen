@@ -159,7 +159,7 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir,epochs=1000,base_b
             print(f"Checkpoint saved at epoch {epoch + 1}")
             
         # Save model every 10 epochs (额外保存)
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % 5 == 0:
             checkpoint = {
                 'epoch': epoch + 1,
                 'model_state_dict': model.module.state_dict() if num_gpus > 1 else model.state_dict(),
