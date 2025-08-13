@@ -158,19 +158,55 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
                batch_labels.reshape(-1),
                params=params,params_label=batch_params,params_mask=batch_params_mask,w=train_weights
                )
+            
+            # 写入调试信息到文件
+            debug_file = os.path.join(os.path.dirname(model_save_path), f"debug_epoch_{epoch}_batch_{bat}.txt")
+            with open(debug_file, 'w') as f:
+                # 设置numpy打印选项，完整显示所有数据，保持原始格式
+                import numpy as np
+                np.set_printoptions(threshold=np.inf, suppress=False)
+                
+                # 真实knot
+                raw_knot_values = batch_knots[0, :, 0].cpu()
+                raw_knot_mask = batch_knots_mask[0, 1:].cpu()
+                raw_knot = raw_knot_values[1:][raw_knot_mask].numpy()
+                f.write(f"raw_knot: {repr(raw_knot)}\n")
+                
+                # 真实param
+                raw_param = batch_params[0][batch_params_mask[0]].cpu().numpy()
+                f.write(f"raw_param: {repr(raw_param)}\n")
+                
+                # 模型knot
+                model_knot_values = knots[0, :, 0].cpu()
+                model_knot_mask = knots_mask[0, 1:].cpu()
+                model_knot = model_knot_values[1:][model_knot_mask].numpy()
+                f.write(f"model_knot: {repr(model_knot)}\n")
+                
+                # 模型param
+                model_param = params[0][batch_params_mask[0]].cpu().detach().numpy()
+                f.write(f"model_param: {repr(model_param)}\n")
+                
+                # points - 完整打印所有点
+                points_array = batch_points[0,:,:].cpu().numpy()
+                f.write(f"points: {repr(points_array)}\n")
+                
+                # 恢复默认的numpy打印选项
+                np.set_printoptions(threshold=1000, suppress=True)
+            import pdb;pdb.set_trace()
 
+            
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             
             train_loss.update(loss.item(), batch_knots.size(0))
-            print(f'Epoch {epoch}: train\tLoss: {train_loss.avg:.6f}')
+            
             # 由于不再需要排序，设置虚拟的准确率为1.0
             # train_accuracy.update(1.0, batch_params_mask.int().sum().item())
             # train_loss_order.update(order_loss.item(), batch_knots.size(0))
             # train_loss_param.update(param_loss.item(), batch_params_mask.int().sum().item())
             # train_loss_knots.update(knots_loss.item(), batch_knots_mask[:,1:].int().sum().item())
-
+        print(f'Epoch {epoch}: train\tLoss: {train_loss.avg:.6f}')
         # if bat % log_interval == 0:
         #   print(f'Epoch {epoch}: '
         #         f'Train [{bat * len(batch_data):9d}/{len(train_dataset):9d} '
