@@ -62,36 +62,63 @@ class PointsEncoderDecoder11(nn.Module):
         self.encoder=encoder
         self.encoder2=encoder2
         self.decoder_k=knot_decoder
-        self.decoder_p=param_decoder
+        self.decoder_p=param_decoder  # 保留用于兼容性，但可能不再使用
         self.decoder_p2=param_decoder2
         self.lock_encoder=lock_encoder
         self.lock_knots=lock_knots
         self.disturb_knot=disturb_knot
 
-    def forward(self,points,params,points_mask,points_len,label,knots,knots_mask,eval=False,half_eval=False):
+    def forward(self,points,params,params_mask,points_mask,points_len,label,knots,knots_mask,eval=False,half_eval=False):
         if eval:
             return self.do_eval(points,points_mask,points_len)
         if half_eval:
             return self.half_eval(points,points_mask,points_len,label)
+        
+        # 编码器部分
         if self.lock_encoder:
             with torch.no_grad():
                 encoder_output=self.encoder(points,points_mask)
         else:
             encoder_output=self.encoder(points,points_mask)
 
+        # 节点预测部分
         if self.lock_knots:
             with torch.no_grad():
                 knots,knots_tmp,kv=self.decoder_k(encoder_output,points_mask,knots,knots_mask)
         else:
             knots,knots_tmp,kv=self.decoder_k(encoder_output,points_mask,knots,knots_mask)
 
+        # 简化：直接使用第二个编码器的输出进行参数预测，无需排序
         encoder_output2=self.encoder2(points,points_mask)
-        embedding_expanded=pad_item_torch(encoder_output2)
-        pointer_log_scores,pointer_argmax,decoder_output=self.decoder_p(embedding_expanded,encoder_output,points_mask,points_len,label,knots_embedding=knots_tmp,
-                                                                        knots_kv=kv,
-                                                                        knots_mask=knots_mask)
-        params=self.decoder_p2(decoder_output,points_mask).squeeze()
-        return knots,knots_mask,pointer_log_scores,pointer_argmax,params
+        
+        # 获取参数的实际长度
+        params_seq_len = params_mask.shape[1] if params_mask is not None else encoder_output2.shape[1]
+        
+        # 截取或填充编码器输出到参数长度
+        if encoder_output2.shape[1] > params_seq_len:
+            # 如果编码器输出长度大于参数长度，截取前面部分
+            encoder_for_params = encoder_output2[:, :params_seq_len, :]
+        elif encoder_output2.shape[1] < params_seq_len:
+            # 如果编码器输出长度小于参数长度，用零填充
+            pad_length = params_seq_len - encoder_output2.shape[1]
+            padding = torch.zeros(encoder_output2.shape[0], pad_length, encoder_output2.shape[2], 
+                                device=encoder_output2.device)
+            encoder_for_params = torch.cat([encoder_output2, padding], dim=1)
+        else:
+            encoder_for_params = encoder_output2
+        
+        # 直接进行参数预测，不需要指针网络
+        params=self.decoder_p2(encoder_for_params,params_mask).squeeze()
+        
+        # 为了兼容性，返回虚拟的指针网络输出
+        batch_size, seq_len = points.shape[:2]
+        device = points.device
+        
+        # 创建虚拟的log_pointer_scores和pointer_argmax
+        dummy_log_scores = torch.zeros(batch_size, seq_len, seq_len, device=device)
+        dummy_argmax = torch.arange(seq_len, device=device).unsqueeze(0).expand(batch_size, -1)
+        
+        return knots,knots_mask,dummy_log_scores,dummy_argmax,params
 
     def do_eval(self,points,points_mask,points_len):
         with torch.no_grad():
@@ -100,7 +127,7 @@ class PointsEncoderDecoder11(nn.Module):
             # embedding_expanded=pad_item_torch(encoder_output)
             encoder_output2=self.encoder2(points,points_mask)
             embedding_expanded=pad_item_torch(encoder_output2)
-            pointer_log_scores,pointer_argmax,decoder_output=self.decoder_p(embedding_expanded,encoder_output,points_mask,points_len,None,knots_embedding=knots_internal,
+            pointer_log_scores,pointer_argmax,decoder_output=self.decoder_p(embedding_expanded,encoder_output,points_mask,points_mask,points_len,None,knots_embedding=knots_internal,
                                                                             knots_mask=knots_mask,knots_kv=kv)
             params=self.decoder_p2(decoder_output,points_mask).squeeze()
             return knots,knots_mask,pointer_log_scores,pointer_argmax,params.clip(0,1)
@@ -112,7 +139,7 @@ class PointsEncoderDecoder11(nn.Module):
 
         encoder_output2=self.encoder2(points,points_mask)
         embedding_expanded=pad_item_torch(encoder_output2)
-        pointer_log_scores,pointer_argmax,decoder_output=self.decoder_p(embedding_expanded,encoder_output,points_mask,points_len,label,
+        pointer_log_scores,pointer_argmax,decoder_output=self.decoder_p(embedding_expanded,encoder_output,points_mask,points_mask,points_len,label,
                                                                         knots_embedding=knots_internal,
                                                                         knots_kv=kv,
                                                                         knots_mask=knots_mask)

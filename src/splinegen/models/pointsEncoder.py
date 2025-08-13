@@ -28,7 +28,8 @@ class PointsEncoder(nn.Module):
         # torch._assert(x.shape[1]==mask.shape[1],f"the length of x and mask should be the same, but got {x.shape[1]} and {mask.shape[1]}")
         x=self.linear_projection(x)# torch.Size([32, 50, 512])
         x=self.dropout(x)
-        # x=self.position_encoder(x)
+        # 启用位置编码
+        x=self.position_encoder(x)
         x_ = self.encoder(x,src_key_padding_mask=torch.logical_not(mask))
         # torch._assert(x_.shape[1]==mask.shape[1],f"the length of x and mask should be the same, but got {x_.shape[1]} and {mask.shape[1]}")
 
@@ -82,7 +83,7 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         """
         Args:
-            x: Tensor, shape [seq_len, batch_size, d_model]
+            x: Tensor, shape [batch_size, seq_len, d_model] (batch_first=True)
         """
         # Take the positional encodings up to the sequence length of the input
         x = x + self.pe[:, :x.size(1)]

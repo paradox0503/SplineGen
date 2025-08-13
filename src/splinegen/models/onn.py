@@ -98,6 +98,7 @@ class CurveOrderingNet13(nn.Module):
     dropout: float = 0.1,
     c_hidden: int = 2,
     internal_attention=False,
+    param_output_dim: int = 20
   ):
     super().__init__()
     self.c_hidden = c_hidden
@@ -106,6 +107,7 @@ class CurveOrderingNet13(nn.Module):
     self.n_heads = n_heads
     self.n_layers = n_layers
     self.dropout = dropout
+    self.param_output_dim = param_output_dim
 
     self.embedding = nn.Linear(c_inputs, c_embed, bias=False)
     # encoder_layers = nn.TransformerEncoderLayer(c_embed, n_heads, c_hidden, dropout)
@@ -126,6 +128,7 @@ class CurveOrderingNet13(nn.Module):
     batch_data: torch.Tensor,
     point_embeddings:torch.Tensor,
     point_masks:torch.Tensor,
+    params_mask:torch.Tensor,
     batch_lengths: torch.Tensor,
     batch_labels: Optional[torch.Tensor] = None,
     knots_embedding: Optional[torch.Tensor] = None,
@@ -192,7 +195,7 @@ class CurveOrderingNet13(nn.Module):
       #   memory_mask=dm,tgt_key_padding_mask=tgt_padding_mask)
 
       # pass through pointer network
-      decoder_outputs=decoder_outputs.permute(1, 0, 2)
+      decoder_outputs=decoder_outputs.permute(1, 0, 2) 
       log_pointer_scores = self.pointer(
         decoder_outputs,
         x_embed,

@@ -20,13 +20,12 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
 
     use_cuda = True
     num_gpus = torch.cuda.device_count() if use_cuda else 0
+    # num_gpus = 1
     print(f"Found {num_gpus} available GPUs. Using {'multi-GPU' if num_gpus > 1 else 'single-GPU'} training.")
     device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
     if num_gpus == 0 and use_cuda:
         print("Warning: No GPU available, falling back to CPU.")
 
-    # log_path=log_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    # model_save_path = model_save_path+'/'+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
     log_path=log_path
     model_save_path = model_save_path
 
@@ -55,11 +54,6 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
       num_workers=n_workers,shuffle=False,pin_memory=True)
 
     model=getModel.getModel_SimpleEncoder_Knots(device=device,knot_load_path=knot_model_load_path,input_dim=input_dim)
-    # model = getModel.getModel_SimpleEncoder_Knots(
-    #     device=device if num_gpus > 0 else 'cpu',  # 先加载到主GPU
-    #     knot_load_path=knot_model_load_path,
-    #     input_dim=input_dim
-    # )
     if num_gpus > 1:
         model = torch.nn.DataParallel(model)
         model = model.to(device)  # 移动到主GPU
@@ -102,25 +96,23 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
 
     def params_loss_fn(params_label,params,params_mask):
         loss = torch.nn.functional.mse_loss(params, params_label, reduction='none')
-    
-        # inverted_Token_mask = 1 - Token_mask
-        # masked_loss = loss * inverted_Token_mask
         
         loss = loss.masked_fill(params_mask == 0, 0)
         loss = loss.sum(dim=-1)
-        # loss = loss.sum(dim=-1)
         valid_len = params_mask.sum(dim = -1)
 
         loss = loss/valid_len
         loss= torch.mean(loss)
 
         return loss
+    
     def criterion(score,label,params,params_label,params_mask,w):
-        loss1=torch.nn.NLLLoss(ignore_index=TOKENS['<eos>'])(score,label)
+        # 由于不再需要排序，order loss设为0
+        # loss1 = torch.tensor(0.0, device=params.device)  # 虚拟的排序损失
+        loss2 = params_loss_fn(params,params_label,params_mask)
 
-        loss2=params_loss_fn(params,params_label,params_mask)
-
-        return loss1,loss2,w[0]*loss1+w[1]*loss2
+        # return loss1,loss2,w[1]*loss2  # 只使用参数损失
+        return loss2
 
     train_loss = AverageMeter()
     train_loss_order = AverageMeter()
@@ -139,7 +131,8 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
         # for bat, (batch_data, batch_labels, batch_lengths,batch_mask,batch_params,batch_points) in enumerate(tqdm(train_loader)):
             batch_labels = input['targets'].to(device)
             batch_lengths = input['length'].to(device)
-            batch_mask=input['points_mask'].to(device)
+            batch_points_mask=input['points_mask'].to(device)
+            batch_params_mask=input['params_mask'].to(device)
             batch_params=input['params'].to(device=device,dtype=torch.float32)
             batch_points=input['points'].to(device)
             batch_knots=input['knots_expanded'].to(device)
@@ -151,14 +144,14 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
             #     batch_labels,batch_knots[:,:-1],batch_knots_mask[:,:-1],half_eval=True
             # )
             knots,knots_mask,log_pointer_scores, pointer_argmaxs,params = model(
-                batch_points,batch_params,batch_mask, batch_lengths,
+                batch_points,batch_params,batch_params_mask,batch_points_mask, batch_lengths,
                 batch_labels,batch_knots[:,:-1],batch_knots_mask[:,:-1]
             )
 
-            order_loss,param_loss,loss = criterion(
+            loss = criterion(
                log_pointer_scores.view(-1, log_pointer_scores.shape[-1]),
                batch_labels.reshape(-1),
-               params=params,params_label=batch_params,params_mask=batch_mask,w=train_weights
+               params=params,params_label=batch_params,params_mask=batch_params_mask,w=train_weights
                )
 
             loss.backward()
@@ -166,22 +159,9 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
             optimizer.step()
             
             train_loss.update(loss.item(), batch_knots.size(0))
-            mask = batch_labels != TOKENS['<eos>']
-            acc = masked_accuracy(pointer_argmaxs, batch_labels, mask).item()
-            train_accuracy.update(acc, mask.int().sum().item())
-            train_loss_order.update(order_loss.item(), batch_knots.size(0))
-            train_loss_param.update(param_loss.item(), batch_mask.int().sum().item())
-            # train_loss_knots.update(knots_loss.item(), batch_knots_mask[:,1:].int().sum().item())
-
-        # if bat % log_interval == 0:
-        #   print(f'Epoch {epoch}: '
-        #         f'Train [{bat * len(batch_data):9d}/{len(train_dataset):9d} '
-        #         f'Loss: {train_loss.avg:.6f}\tAccuracy: {train_accuracy.avg:3.4%}')
-                  
+            print(f'Epoch {epoch}: train\tLoss: {train_loss.avg:.6f}')
+    
         writer.add_scalar('Loss/train',train_loss.avg,epoch)
-        writer.add_scalar('Order Loss/train',train_loss_order.avg,epoch)
-        writer.add_scalar('Param Loss/train',train_loss_param.avg,epoch)
-        writer.add_scalar('Accuracy/train',train_accuracy.avg,epoch)
 
         print(f'Epoch {epoch} validating...')
         model.eval()
@@ -190,42 +170,28 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
           for bat, input in enumerate(tqdm(val_loader)):
               batch_labels = input['targets'].to(device)
               batch_lengths = input['length'].to(device)
-              batch_mask=input['points_mask'].to(device)
+              batch_points_mask=input['points_mask'].to(device)
+              batch_params_mask=input['params_mask'].to(device)
               batch_params=input['params'].to(device=device,dtype=torch.float32)
               batch_points=input['points'].to(device)
               batch_knots=input['knots_expanded'].to(device)
               batch_knots_mask=input['knots_mask_expanded'].to(device)
 
               knots,knots_mask,log_pointer_scores, pointer_argmaxs,params = model(
-                  batch_points,batch_params,batch_mask, batch_lengths,
+                  batch_points,batch_params,batch_params_mask,batch_points_mask, batch_lengths,
                   batch_labels,batch_knots[:,:-1],batch_knots_mask[:,:-1]
               )
 
-              order_loss,param_loss,loss = criterion(
+              loss = criterion(
                 log_pointer_scores.view(-1, log_pointer_scores.shape[-1]),
                 batch_labels.reshape(-1),
-                params=params,params_label=batch_params,params_mask=batch_mask,w=train_weights)
+                params=params,params_label=batch_params,params_mask=batch_params_mask,w=train_weights)
 
               val_loss.update(loss.item(), batch_knots.size(0))
-              mask = batch_labels != TOKENS['<eos>']
-              acc = masked_accuracy(pointer_argmaxs, batch_labels, mask).item()
-              val_accuracy.update(acc, mask.int().sum().item())
-              val_loss_order.update(order_loss.item(), batch_knots.size(0))
-              val_loss_param.update(param_loss.item(), batch_mask.int().sum().item())
-
-        # if bat % log_interval == 0:
-        #   print(f'Epoch {epoch}: '
-        #         f'Train [{bat * len(batch_data):9d}/{len(train_dataset):9d} '
-        #         f'Loss: {train_loss.avg:.6f}\tAccuracy: {train_accuracy.avg:3.4%}')
                   
         writer.add_scalar('Loss/val',val_loss.avg,epoch)
-        writer.add_scalar('Order Loss/val',val_loss_order.avg,epoch)
-        writer.add_scalar('Param Loss/val',val_loss_param.avg,epoch)
-        writer.add_scalar('Accuracy/val',val_accuracy.avg,epoch)
-        # writer.add_scalar('Accuracy/val',train_accuracy.avg,epoch)
 
-        # print(f'Epoch {epoch}: Val\tLoss: {val_loss.avg:.6f} '
-        #         f'\tAccuracy: {val_accuracy.avg:3.4%} '
+        print(f'Epoch {epoch}: Val\tLoss: {val_loss.avg:.6f}')
         
         # 保存 checkpoint
         if (epoch + 1) % save_epoch == 0:
@@ -273,27 +239,6 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
         val_loss_order.reset()
         val_loss_param.reset()
                   
-
-def find_latest_checkpoint(model_dir):
-    """查找最新的checkpoint文件"""
-    if not os.path.exists(model_dir):
-        return None
-    
-    checkpoint_files = []
-    for file in os.listdir(model_dir):
-        if 'epoch_' in file and file.endswith('.pth'):
-            # 提取epoch数字，适配当前文件名格式 model_save_path_epoch_X.pth
-            match = re.search(r'epoch_(\d+)\.pth', file)
-            if match:
-                epoch_num = int(match.group(1))
-                checkpoint_files.append((epoch_num, os.path.join(model_dir, file)))
-    
-    if checkpoint_files:
-        # 返回最新的checkpoint文件路径
-        latest_checkpoint = max(checkpoint_files, key=lambda x: x[0])
-        return latest_checkpoint[1]
-    
-    return None
 
 if __name__=='__main__':
     train()
