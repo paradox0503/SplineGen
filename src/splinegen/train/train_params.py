@@ -19,8 +19,8 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
     torch.random.manual_seed(231)
 
     use_cuda = True
-    num_gpus = torch.cuda.device_count() if use_cuda else 0
-    # num_gpus = 1
+    # num_gpus = torch.cuda.device_count() if use_cuda else 0
+    num_gpus = 1
     print(f"Found {num_gpus} available GPUs. Using {'multi-GPU' if num_gpus > 1 else 'single-GPU'} training.")
     device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
     if num_gpus == 0 and use_cuda:
@@ -54,6 +54,11 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
       num_workers=n_workers,shuffle=False,pin_memory=True)
 
     model=getModel.getModel_SimpleEncoder_Knots(device=device,knot_load_path=knot_model_load_path,input_dim=input_dim)
+    # model = getModel.getModel_SimpleEncoder_Knots(
+    #     device=device if num_gpus > 0 else 'cpu',  # 先加载到主GPU
+    #     knot_load_path=knot_model_load_path,
+    #     input_dim=input_dim
+    # )
     if num_gpus > 1:
         model = torch.nn.DataParallel(model)
         model = model.to(device)  # 移动到主GPU
@@ -160,8 +165,21 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
             
             train_loss.update(loss.item(), batch_knots.size(0))
             print(f'Epoch {epoch}: train\tLoss: {train_loss.avg:.6f}')
-    
+            # 由于不再需要排序，设置虚拟的准确率为1.0
+            # train_accuracy.update(1.0, batch_params_mask.int().sum().item())
+            # train_loss_order.update(order_loss.item(), batch_knots.size(0))
+            # train_loss_param.update(param_loss.item(), batch_params_mask.int().sum().item())
+            # train_loss_knots.update(knots_loss.item(), batch_knots_mask[:,1:].int().sum().item())
+
+        # if bat % log_interval == 0:
+        #   print(f'Epoch {epoch}: '
+        #         f'Train [{bat * len(batch_data):9d}/{len(train_dataset):9d} '
+        #         f'Loss: {train_loss.avg:.6f}\tAccuracy: {train_accuracy.avg:3.4%}')
+                  
         writer.add_scalar('Loss/train',train_loss.avg,epoch)
+        # writer.add_scalar('Order Loss/train',train_loss_order.avg,epoch)
+        # writer.add_scalar('Param Loss/train',train_loss_param.avg,epoch)
+        # writer.add_scalar('Accuracy/train',train_accuracy.avg,epoch)
 
         print(f'Epoch {epoch} validating...')
         model.eval()
@@ -188,8 +206,21 @@ def train(ifsave,data_path,model_save_path,log_path,knot_model_load_path,train_w
                 params=params,params_label=batch_params,params_mask=batch_params_mask,w=train_weights)
 
               val_loss.update(loss.item(), batch_knots.size(0))
+              # 由于不再需要排序，设置虚拟的准确率为1.0
+            #   val_accuracy.update(1.0, batch_params_mask.int().sum().item())
+            #   val_loss_order.update(order_loss.item(), batch_knots.size(0))
+            #   val_loss_param.update(param_loss.item(), batch_params_mask.int().sum().item())
+
+        # if bat % log_interval == 0:
+        #   print(f'Epoch {epoch}: '
+        #         f'Train [{bat * len(batch_data):9d}/{len(train_dataset):9d} '
+        #         f'Loss: {train_loss.avg:.6f}\tAccuracy: {train_accuracy.avg:3.4%}')
                   
         writer.add_scalar('Loss/val',val_loss.avg,epoch)
+        # writer.add_scalar('Order Loss/val',val_loss_order.avg,epoch)
+        # writer.add_scalar('Param Loss/val',val_loss_param.avg,epoch)
+        # writer.add_scalar('Accuracy/val',val_accuracy.avg,epoch)
+        # writer.add_scalar('Accuracy/val',train_accuracy.avg,epoch)
 
         print(f'Epoch {epoch}: Val\tLoss: {val_loss.avg:.6f}')
         
