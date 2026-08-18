@@ -36,7 +36,7 @@ def train(data_path,log_path,encoder_path,knot_model_save_dir):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 
-    model=getModel.getModel_Simple(device=device,encoder_load_path=encoder_path,input_dim=input_dim)
+    model=getModel.getModel_Simple(device=device,encoder_load_path=encoder_path,input_dim=input_dim,ordered=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     def loss_fn(knots_pred, knots, knots_mask):

@@ -49,7 +49,8 @@ def train(data_path,log_dir,model_save_dir):
          num_layers=num_encoder_layers, 
          num_head=nhead, 
          dim_feedforward=dim_feedforward,
-         dropout=dropout)
+         dropout=dropout,
+         ordered=True)
 
     decoder1=models.kkn.KPN(
          d_model,

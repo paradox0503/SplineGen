@@ -18,7 +18,7 @@ TOKENS = {
   '<eos>': 0
 }
 
-def getModel_Simple(device='cuda',encoder_load_path=None,model_load_path=None,input_dim=3):
+def getModel_Simple(device='cuda',encoder_load_path=None,model_load_path=None,input_dim=3,ordered=False):
      d_model = 512  # Embedding dimension
      nhead = 4
 
@@ -36,7 +36,8 @@ def getModel_Simple(device='cuda',encoder_load_path=None,model_load_path=None,in
           num_layers=en_num_encoder_layers, 
           num_head=en_nhead, 
           dim_feedforward=dim_feedforward,
-          dropout=en_dropout).to(device=device)
+          dropout=en_dropout,
+          ordered=ordered).to(device=device)
 
      decoder=models.kkn.KPN2(
           d_model,
@@ -151,6 +152,74 @@ def getModel_SimpleEncoder_Knots(device='cuda',input_dim=3,internal_attention=Tr
                print("Knot Decoder loaded")
 
      return model
+
+
+def getOrderedSplineGen(
+    device='cuda',
+    model_load_path='',
+    knot_load_path='',
+    input_dim=3,
+    lock_encoder=False,
+    lock_knots=False,
+):
+    """Build SplineGen for ordered samples from open curves."""
+    d_model = 512
+    nhead = 4
+    dim_feedforward = 2048
+
+    encoder = models.pointsEncoder.PointsEncoder(
+        input_dim,
+        hidden_dim=d_model,
+        num_layers=3,
+        num_head=nhead,
+        dim_feedforward=dim_feedforward,
+        dropout=0.05,
+        ordered=True,
+    ).to(device=device)
+    knot_decoder = models.kkn.KPN2(
+        d_model,
+        num_decoder_layers=3,
+        nhead=nhead,
+        dim_feedforward=dim_feedforward,
+        dropout=0.01,
+    ).to(device=device)
+    parameter_decoder = models.param_decoder.MonotonicParameterHead(
+        d_model=d_model,
+        nhead=nhead,
+        dim_feedforward=dim_feedforward,
+        dropout=0.05,
+    ).to(device=device)
+
+    model = models.encoder_decoder.OrderedSplineGen(
+        encoder=encoder,
+        knot_decoder=knot_decoder,
+        param_decoder=parameter_decoder,
+        degree=3,
+        max_knots_len=29,
+        lock_encoder=lock_encoder,
+        lock_knots=lock_knots,
+    ).to(device)
+
+    if model_load_path:
+        model.load_state_dict(torch.load(model_load_path, map_location=device))
+        print("Ordered SplineGen model loaded")
+    elif knot_load_path:
+        states = torch.load(knot_load_path, map_location=device)
+        encoder_states = {
+            key[len('encoder.'):]: value
+            for key, value in states.items()
+            if key.startswith('encoder.')
+        }
+        decoder_states = {
+            key[len('decoder.'):]: value
+            for key, value in states.items()
+            if key.startswith('decoder.')
+        }
+        encoder.load_state_dict(encoder_states, strict=False)
+        knot_decoder.load_state_dict(decoder_states)
+        print("Knot model loaded; ordered encoder additions require joint fine-tuning")
+
+    return model
 
 def getSplineGen(device='cuda',model_load_path='',base_model_load_path='',input_dim=3):
 

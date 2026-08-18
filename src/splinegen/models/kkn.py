@@ -126,7 +126,7 @@ class KPN(nn.Module):
         # tgt = self.pos_encoder(tgt)
 
         max_knots_len = tgt.size(1)
-        tgt_mask_lower_tridiagonal = nn.Transformer.generate_square_subsequent_mask(max_knots_len, device='cuda')
+        tgt_mask_lower_tridiagonal = nn.Transformer.generate_square_subsequent_mask(max_knots_len, device=tgt.device)
 
         memory_mask=src_key_padding_mask.unsqueeze(1).expand(-1,max_knots_len,-1).repeat((self.nhead, 1, 1))
         
@@ -241,7 +241,7 @@ class KPN2(nn.Module):
         # tgt = self.pos_encoder(tgt)
 
         max_knots_len = tgt.size(1)
-        tgt_mask_lower_tridiagonal = nn.Transformer.generate_square_subsequent_mask(max_knots_len, device='cuda')
+        tgt_mask_lower_tridiagonal = nn.Transformer.generate_square_subsequent_mask(max_knots_len, device=tgt.device)
 
         memory_mask=src_key_padding_mask.unsqueeze(1).expand(-1,max_knots_len,-1).repeat((self.nhead, 1, 1))
         

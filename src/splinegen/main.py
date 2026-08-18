@@ -7,10 +7,11 @@ import train.train_knots
 import train.train_params
 import train.train_differientiable_approximation_layer
 import train.eval
+import train.ordered
 
 parser = argparse.ArgumentParser("SplineGen")
 parser.add_argument(
-    "task", choices=("train_encoder","train_knot_decoder","train_param_decoder","train_diff_approximation", "test"), help="Choose train/test task"
+    "task", choices=("train_encoder","train_knot_decoder","train_param_decoder","train_diff_approximation", "test_ordered", "test"), help="Choose train/test task"
 )
 parser.add_argument("--dataset_path", type=str, help="Path to dataset")
 parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
@@ -76,10 +77,23 @@ elif args.task=='train_knot_decoder':
     train.train_knots.train(args.dataset_path,log_path,args.encoder_path,model_save_path)
 
 elif args.task=='train_param_decoder':
-    train.train_params.train(args.dataset_path,model_save_path,log_path,args.knot_path)
+    train.ordered.train_parameters(
+        args.dataset_path, model_save_path, log_path, args.knot_path,
+        batch_size=args.batch_size, n_workers=args.num_workers
+    )
 
 elif args.task=='train_diff_approximation':
-    train.train_differientiable_approximation_layer.train(args.dataset_path,log_path,model_save_path,args.base_model_path)
+    train.ordered.train_geometry(
+        args.dataset_path, log_path, model_save_path, args.base_model_path,
+        batch_size=args.batch_size, n_workers=args.num_workers
+    )
+
+elif args.task=='test_ordered':
+    metrics = train.ordered.evaluate(
+        args.dataset_path, args.model_path,
+        batch_size=args.batch_size, n_workers=args.num_workers
+    )
+    print(metrics)
 
 elif args.task=='test':
     train.eval.eval(args.dataset_path,args.model_path)

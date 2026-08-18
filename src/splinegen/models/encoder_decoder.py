@@ -187,6 +187,123 @@ class PointsEncoderDecoder11(nn.Module):
         train_output=torch.sort(output,dim=-1)[0]
         return train_output,tgt_mask_position,internal_output,kv
 
+
+class OrderedSplineGen(nn.Module):
+    """SplineGen variant for ordered samples from open curves."""
+
+    def __init__(
+        self,
+        encoder,
+        knot_decoder,
+        param_decoder,
+        degree=3,
+        max_knots_len=29,
+        eos_threshold=0.5,
+        lock_encoder=False,
+        lock_knots=False,
+    ):
+        super().__init__()
+        if max_knots_len < 2 * (degree + 1):
+            raise ValueError("max_knots_len is too small for a clamped open knot vector")
+        self.encoder = encoder
+        self.decoder_k = knot_decoder
+        self.decoder_p = param_decoder
+        self.degree = degree
+        self.max_knots_len = max_knots_len
+        self.eos_threshold = eos_threshold
+        self.lock_encoder = lock_encoder
+        self.lock_knots = lock_knots
+
+    def _encode(self, points, points_mask):
+        if self.lock_encoder:
+            with torch.no_grad():
+                return self.encoder(points, points_mask)
+        return self.encoder(points, points_mask)
+
+    def _decode_teacher_forced(self, embeddings, points_mask, knots, knots_mask):
+        if self.lock_knots:
+            with torch.no_grad():
+                return self.decoder_k(embeddings, points_mask, knots, knots_mask)
+        return self.decoder_k(embeddings, points_mask, knots, knots_mask)
+
+    def forward(self, points, points_mask, knots, knots_mask):
+        """Teacher-forced forward pass used for supervised joint training."""
+        embeddings = self._encode(points, points_mask)
+        knot_predictions, knot_embeddings, _ = self._decode_teacher_forced(
+            embeddings, points_mask, knots, knots_mask
+        )
+        params = self.decoder_p(
+            embeddings, points_mask, knot_embeddings, knots_mask
+        )
+        return knot_predictions, params
+
+    def _project_open_knots(self, raw_knots, prediction_mask):
+        batch_size, max_length = raw_knots.shape
+        endpoint_count = self.degree + 1
+        minimum_count = 2 * endpoint_count
+        predicted_counts = prediction_mask.sum(dim=-1).clamp(
+            min=minimum_count, max=max_length
+        )
+
+        knots = torch.ones_like(raw_knots)
+        knot_mask = torch.zeros_like(prediction_mask)
+        knots[:, :endpoint_count] = 0.0
+
+        for batch_index in range(batch_size):
+            count = int(predicted_counts[batch_index].item())
+            knot_mask[batch_index, :count] = True
+            interior_count = count - minimum_count
+            if interior_count > 0:
+                generated = raw_knots[batch_index][prediction_mask[batch_index]]
+                interior = generated[endpoint_count:endpoint_count + interior_count]
+                knots[batch_index, endpoint_count:endpoint_count + interior_count] = torch.sort(interior)[0]
+            knots[batch_index, endpoint_count + interior_count:count] = 1.0
+
+        return knots, knot_mask
+
+    def generate(self, points, points_mask):
+        """Generate knot count, knot positions, and ordered parameters."""
+        embeddings = self._encode(points, points_mask)
+        batch_size = points.size(0)
+        device = points.device
+
+        target = torch.zeros(batch_size, self.max_knots_len, 3, device=device)
+        target[:, 0, 1] = 1.0
+        target_mask = torch.zeros(
+            batch_size, self.max_knots_len, dtype=torch.bool, device=device
+        )
+        target_mask[:, 0] = True
+        prediction_mask = torch.zeros_like(target_mask)
+        eos_detected = torch.zeros(batch_size, dtype=torch.bool, device=device)
+
+        with torch.no_grad():
+            for step in range(self.max_knots_len):
+                predictions, _, _ = self.decoder_k(
+                    embeddings, points_mask, target, target_mask
+                )
+                active = ~eos_detected
+                next_token = predictions[:, step]
+                next_is_eos = next_token[:, 2] > self.eos_threshold
+                prediction_mask[:, step] = active & ~next_is_eos
+                eos_detected = eos_detected | (active & next_is_eos)
+
+                if step + 1 < self.max_knots_len:
+                    target[:, step + 1] = next_token.detach()
+                    target_mask[:, step + 1] = active
+                if bool(torch.all(eos_detected)):
+                    break
+
+        knot_predictions, knot_embeddings, _ = self._decode_teacher_forced(
+            embeddings, points_mask, target, target_mask
+        )
+        knots, knot_mask = self._project_open_knots(
+            knot_predictions[..., 0], prediction_mask
+        )
+        params = self.decoder_p(
+            embeddings, points_mask, knot_embeddings, target_mask
+        )
+        return knots, knot_mask, params
+
 class SplineGen(nn.Module):
     def __init__(self, base_model,additional_model) -> None:
         super().__init__()
